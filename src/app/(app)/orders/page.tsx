@@ -7,7 +7,12 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
-type MenuItem = { id: string; name: string; isActive: boolean };
+type MenuItem = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  menuApprovalStatus?: string;
+};
 type Order = {
   id: string;
   tableNumber: string;
@@ -96,7 +101,11 @@ export default function OrdersPage() {
         />
         <div className="max-h-48 space-y-2 overflow-y-auto">
           {(menu.data?.menuItems ?? [])
-            .filter((item) => item.isActive !== false)
+            .filter(
+              (item) =>
+                item.isActive !== false &&
+                item.menuApprovalStatus === "APPROVED",
+            )
             .map((item) => (
               <div
                 key={item.id}
