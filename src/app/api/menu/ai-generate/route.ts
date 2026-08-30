@@ -1,14 +1,17 @@
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { ingredients, menuItems, recipeBoms, restaurants } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { suggestMenuAndRecipes } from "@/lib/gemini";
 
+/** Batched Gemini calls for a full ~40-item menu can take 1–2 minutes. */
+export const maxDuration = 300;
+
 const schema = z.object({
   focus: z.string().optional(),
-  count: z.number().int().min(1).max(12).optional(),
+  count: z.number().int().min(1).max(48).optional(),
   persist: z.boolean().default(true),
 });
 
@@ -48,6 +51,20 @@ export async function POST(request: Request) {
     if (!body.persist) {
       return jsonOk({ suggestion, persisted: [] });
     }
+
+    // Full regenerate replaces draft/pending AI stubs so runs don't stack (6+6…).
+    // Approved items are kept.
+    await db
+      .delete(menuItems)
+      .where(
+        and(
+          eq(menuItems.restaurantId, session.restaurantId),
+          inArray(menuItems.menuApprovalStatus, [
+            "PENDING_APPROVAL",
+            "DRAFT",
+          ]),
+        ),
+      );
 
     const persisted = [];
 

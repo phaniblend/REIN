@@ -100,7 +100,8 @@ async function generateContentOnce(
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.4,
+        temperature: 0.5,
+        maxOutputTokens: 8192,
         responseMimeType: "application/json",
       },
     }),
@@ -179,6 +180,78 @@ async function generateJson<T>(prompt: string, schema: z.ZodType<T>): Promise<T>
     : new Error("Menu generation failed");
 }
 
+type MenuBatch = { label: string; count: number; detail: string };
+
+function indianMenuBatches(): MenuBatch[] {
+  return [
+    {
+      label: "Appetizers / Starters",
+      count: 8,
+      detail:
+        'Mix of vegetarian and non-vegetarian Indian starters. Category must be exactly "Appetizers".',
+    },
+    {
+      label: "Soups & Salads",
+      count: 4,
+      detail:
+        'Indian restaurant soups and salads (veg and non-veg). Category must be exactly "Soups & Salads".',
+    },
+    {
+      label: "Main Course — Vegetarian",
+      count: 8,
+      detail:
+        'Classic vegetarian Indian mains (paneer, dal, sabzi, kofta). Category must be exactly "Main Course — Veg".',
+    },
+    {
+      label: "Main Course — Non-Vegetarian",
+      count: 8,
+      detail:
+        'Classic non-veg Indian mains (chicken, mutton, fish, egg). Category must be exactly "Main Course — Non-Veg".',
+    },
+    {
+      label: "Breads, Rice & Sides",
+      count: 6,
+      detail:
+        'Naan, roti, rice, raita, and sides. Use category "Breads & Rice" or "Sides".',
+    },
+    {
+      label: "Desserts & Beverages",
+      count: 6,
+      detail:
+        'Indian desserts and drinks. Use category "Desserts" or "Beverages".',
+    },
+  ];
+}
+
+function genericMenuBatches(total: number): MenuBatch[] {
+  const appetizers = Math.max(6, Math.round(total * 0.2));
+  const mains = Math.max(10, Math.round(total * 0.4));
+  const sides = Math.max(6, Math.round(total * 0.15));
+  const desserts = Math.max(4, total - appetizers - mains - sides);
+  return [
+    {
+      label: "Appetizers",
+      count: appetizers,
+      detail: 'Starters/appetizers. Category "Appetizers".',
+    },
+    {
+      label: "Main Course",
+      count: mains,
+      detail: 'Main courses covering the cuisine. Category "Main Course".',
+    },
+    {
+      label: "Sides / Breads / Rice",
+      count: sides,
+      detail: 'Sides, breads, rice. Category "Sides" or "Breads & Rice".',
+    },
+    {
+      label: "Desserts & Beverages",
+      count: desserts,
+      detail: 'Desserts and beverages. Categories "Desserts" or "Beverages".',
+    },
+  ];
+}
+
 export async function suggestMenuAndRecipes(input: {
   cuisineType: string;
   restaurantName: string;
@@ -190,21 +263,37 @@ export async function suggestMenuAndRecipes(input: {
   focus?: string;
   count?: number;
 }): Promise<MenuRecipeSuggestion> {
-  const count = input.count ?? 6;
+  const requested = Math.min(Math.max(input.count ?? 40, 1), 48);
   const location = [input.city, input.region, input.country]
     .filter(Boolean)
     .join(", ");
+  const cuisine = input.cuisineType || "Indian";
+  const isIndian = /indian|north indian|south indian|punjabi|mughlai|indo/i.test(
+    cuisine,
+  );
 
-  const prompt = `You are a restaurant culinary ops assistant for Restman.
+  const batches = isIndian ? indianMenuBatches() : genericMenuBatches(requested);
+
+  const baseContext = `Restaurant: ${input.restaurantName}
+Cuisine: ${cuisine}
+Location: ${location || "unspecified"}
+Currency: ${input.currency ?? "USD"}
+Existing ingredients to prefer when relevant: ${(input.existingIngredients ?? []).join(", ") || "none"}
+Owner focus note: ${input.focus ?? "full dine-in lunch and dinner menu"}`;
+
+  const allItems: MenuRecipeSuggestion["items"] = [];
+
+  for (const batch of batches) {
+    const prompt = `You are a restaurant culinary ops assistant for Restman.
 Return ONLY valid JSON matching this TypeScript shape:
 {
   "items": [{
     "name": string,
-    "category": "Starters" | "Main Course" | "Breads" | "Desserts" | "Beverages" | string,
+    "category": string,
     "sellingPrice": number,
     "ingredients": [{
       "name": string,
-      "category": "Proteins" | "Dairy" | "Vegetables" | "Dry Goods" | "Spices" | "Oils" | string,
+      "category": string,
       "unit": "KG" | "G" | "L" | "ML" | "PIECE" | "PACKET",
       "grossQuantity": number,
       "shrinkageMarginPercent": number,
@@ -213,17 +302,28 @@ Return ONLY valid JSON matching this TypeScript shape:
   }]
 }
 
-Restaurant: ${input.restaurantName}
-Cuisine: ${input.cuisineType}
-Location: ${location || "unspecified"}
-Currency: ${input.currency ?? "USD"}
-Existing ingredients to prefer when relevant: ${(input.existingIngredients ?? []).join(", ") || "none"}
-Focus: ${input.focus ?? "signature dishes with measurable BOM yield"}
-Generate exactly ${count} menu items with realistic portion BOMs for kitchen yield tracking.
-Use practical units (G/ML for portion-level, KG/L for bulk proteins/oils when per-portion amounts are large).
-Prices and costs should be realistic for the location.`;
+${baseContext}
 
-  return generateJson(prompt, menuRecipeSuggestionSchema);
+Generate a FULL menu section for: ${batch.label}
+${batch.detail}
+Generate exactly ${batch.count} distinct dishes (no duplicates, no placeholders).
+Each dish needs a realistic per-portion BOM for kitchen yield tracking.
+Use practical units (G/ML for portion-level).
+Prices and costs should be realistic for the location and cuisine.`;
+
+    const partial = await generateJson(prompt, menuRecipeSuggestionSchema);
+    allItems.push(...partial.items.slice(0, batch.count));
+  }
+
+  const seen = new Set<string>();
+  const items = allItems.filter((item) => {
+    const key = item.name.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  return menuRecipeSuggestionSchema.parse({ items });
 }
 
 export async function getLocationCuisineStats(input: {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,25 @@ type MenuItem = {
   menuApprovalStatus: string;
   recipe: unknown[];
 };
+
+const CATEGORY_ORDER = [
+  "Appetizers",
+  "Soups & Salads",
+  "Main Course — Veg",
+  "Main Course — Non-Veg",
+  "Main Course",
+  "Breads & Rice",
+  "Sides",
+  "Desserts",
+  "Beverages",
+];
+
+function categorySortKey(category: string) {
+  const idx = CATEGORY_ORDER.findIndex(
+    (c) => c.toLowerCase() === category.trim().toLowerCase(),
+  );
+  return idx === -1 ? 100 + category.charCodeAt(0) : idx;
+}
 
 export default function MenuPage() {
   const qc = useQueryClient();
@@ -37,7 +56,7 @@ export default function MenuPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           focus: focus || undefined,
-          count: 6,
+          count: 40,
           persist: true,
         }),
       });
@@ -57,6 +76,19 @@ export default function MenuPage() {
 
   const items = menu.data?.menuItems ?? [];
 
+  const grouped = useMemo(() => {
+    const map = new Map<string, MenuItem[]>();
+    for (const item of items) {
+      const key = item.category?.trim() || "Uncategorized";
+      const list = map.get(key) ?? [];
+      list.push(item);
+      map.set(key, list);
+    }
+    return [...map.entries()].sort(
+      ([a], [b]) => categorySortKey(a) - categorySortKey(b),
+    );
+  }, [items]);
+
   return (
     <div className="animate-rise space-y-4">
       <div>
@@ -64,14 +96,15 @@ export default function MenuPage() {
           Menu & recipes
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Generate a recommended menu with portion recipes for yield tracking.
+          Generate a full categorized lunch & dinner menu (~40 dishes) with
+          portion recipes for yield tracking.
         </p>
       </div>
 
       <Card className="space-y-3">
         <CardTitle>Recommended menu</CardTitle>
         <Input
-          placeholder="Optional focus (e.g. weekend brunch, high-protein)"
+          placeholder="Optional focus (e.g. North Indian, Punjabi, seafood-heavy)"
           value={focus}
           onChange={(e) => setFocus(e.target.value)}
         />
@@ -82,28 +115,39 @@ export default function MenuPage() {
           }}
           disabled={generate.isPending}
         >
-          {generate.isPending ? "Generating…" : "Generate recommended menu"}
+          {generate.isPending
+            ? "Generating full menu… (1–2 min)"
+            : "Generate recommended menu"}
         </Button>
         {message && <p className="text-sm text-[var(--muted)]">{message}</p>}
       </Card>
 
-      <div className="space-y-2">
-        {items.map((item) => (
-          <Card key={item.id} className="space-y-2">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-[var(--muted)]">{item.category}</p>
-              </div>
-              <p className="font-[family-name:var(--font-display)]">
-                {money(num(item.sellingPrice))}
-              </p>
+      <div className="space-y-6">
+        {grouped.map(([category, categoryItems]) => (
+          <section key={category} className="space-y-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--accent)]">
+                {category}
+              </h2>
+              <span className="text-xs text-[var(--muted)]">
+                {categoryItems.length} items
+              </span>
             </div>
-            <div className="flex flex-wrap gap-1">
-              <Badge>{item.menuApprovalStatus}</Badge>
-              <Badge>{item.recipe?.length ?? 0} ingredients</Badge>
-            </div>
-          </Card>
+            {categoryItems.map((item) => (
+              <Card key={item.id} className="space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium">{item.name}</p>
+                  <p className="font-[family-name:var(--font-display)]">
+                    {money(num(item.sellingPrice))}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Badge>{item.menuApprovalStatus}</Badge>
+                  <Badge>{item.recipe?.length ?? 0} ingredients</Badge>
+                </div>
+              </Card>
+            ))}
+          </section>
         ))}
         {items.length === 0 && (
           <p className="text-sm text-[var(--muted)]">
