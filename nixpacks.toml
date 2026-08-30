@@ -1,5 +1,16 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]
+nixPkgs = ["nodejs_20", "openssl"]
+
+[phases.install]
+cmds = ["npm install --no-audit --no-fund"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm run start:railway"
 
 [variables]
 NIXPACKS_NODE_VERSION = "20"
+NPM_CONFIG_PRODUCTION = "false"
+NODE_ENV = "production"
