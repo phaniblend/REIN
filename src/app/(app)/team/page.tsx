@@ -7,6 +7,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { copyText } from "@/lib/clipboard";
 
 type TeamPayload = {
   team: {
@@ -31,7 +32,9 @@ export default function TeamPage() {
   const [name, setName] = useState("");
   const [role, setRole] = useState<"WAITER" | "CHEF" | "STOCK_CLERK">("WAITER");
   const [lastLink, setLastLink] = useState<string | null>(null);
+  const [copyNote, setCopyNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [smsOk, setSmsOk] = useState<boolean | null>(null);
 
   const team = useQuery({
     queryKey: ["staff"],
@@ -60,13 +63,20 @@ export default function TeamPage() {
     },
     onSuccess: (data) => {
       setLastLink(data.link);
+      setSmsOk(data.smsOk);
       setError(null);
+      setCopyNote(null);
       setPhone("");
       setName("");
       qc.invalidateQueries({ queryKey: ["staff"] });
     },
     onError: (err: Error) => setError(err.message),
   });
+
+  async function copyLink(link: string) {
+    const ok = await copyText(link);
+    setCopyNote(ok ? "Link copied." : "Select and copy the link above.");
+  }
 
   return (
     <div className="animate-rise space-y-4">
@@ -108,7 +118,7 @@ export default function TeamPage() {
             }
           >
             <option value="WAITER">Waiter — take orders / mark served</option>
-            <option value="CHEF">Chef — kitchen queue</option>
+            <option value="CHEF">Chef — recipes & kitchen</option>
             <option value="STOCK_CLERK">Stock clerk — inventory</option>
           </select>
         </div>
@@ -126,10 +136,19 @@ export default function TeamPage() {
             <Button
               variant="secondary"
               className="mt-2"
-              onClick={() => navigator.clipboard.writeText(lastLink)}
+              type="button"
+              onClick={() => copyLink(lastLink)}
             >
               Copy link
             </Button>
+            {copyNote && (
+              <p className="mt-2 text-xs text-[var(--muted)]">{copyNote}</p>
+            )}
+            {smsOk === false && (
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                SMS may not have sent — share this link manually.
+              </p>
+            )}
           </div>
         )}
       </Card>
@@ -149,7 +168,14 @@ export default function TeamPage() {
                   </p>
                   <p className="truncate text-xs text-[var(--muted)]">{i.phone}</p>
                 </div>
-                <Badge>pending</Badge>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  type="button"
+                  onClick={() => copyLink(i.link)}
+                >
+                  Copy
+                </Button>
               </li>
             ))}
           </ul>

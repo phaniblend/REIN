@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ type MenuItem = {
   name: string;
   isActive: boolean;
   menuApprovalStatus?: string;
+  recipeApprovalStatus?: string;
 };
 type Order = {
   id: string;
@@ -24,6 +26,19 @@ export default function OrdersPage() {
   const qc = useQueryClient();
   const [tableNumber, setTableNumber] = useState("12");
   const [selected, setSelected] = useState<Record<string, number>>({});
+
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unauthorized");
+      return data as { user: { role: string } };
+    },
+  });
+
+  const role = me.data?.user?.role;
+  const isChef = role === "CHEF";
 
   const menu = useQuery({
     queryKey: ["menu"],
@@ -40,6 +55,17 @@ export default function OrdersPage() {
       return res.json() as Promise<{ orders: Order[] }>;
     },
   });
+
+  const pendingRecipes = useMemo(
+    () =>
+      (menu.data?.menuItems ?? []).filter(
+        (i) =>
+          i.isActive !== false &&
+          i.recipeApprovalStatus !== "APPROVED" &&
+          i.recipeApprovalStatus !== "REJECTED",
+      ).length,
+    [menu.data?.menuItems],
+  );
 
   const items = useMemo(
     () =>
@@ -88,69 +114,97 @@ export default function OrdersPage() {
 
   return (
     <div className="animate-rise space-y-4">
-      <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
-        POS tickets
-      </h1>
+      <div>
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
+          {isChef ? "Kitchen queue" : "POS tickets"}
+        </h1>
+        {isChef && (
+          <p className="text-sm text-[var(--muted)]">
+            Tickets from waiters — mark prep and served. Recipes are set once on
+            the Recipes tab.
+          </p>
+        )}
+      </div>
 
-      <Card className="space-y-3">
-        <CardTitle>New order</CardTitle>
-        <Input
-          value={tableNumber}
-          onChange={(e) => setTableNumber(e.target.value)}
-          placeholder="Table #"
-        />
-        <div className="max-h-48 space-y-2 overflow-y-auto">
-          {(menu.data?.menuItems ?? [])
-            .filter(
-              (item) =>
-                item.isActive !== false &&
-                item.menuApprovalStatus === "APPROVED",
-            )
-            .map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between gap-2 text-sm"
-              >
-                <span>{item.name}</span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    type="button"
-                    onClick={() =>
-                      setSelected((s) => ({
-                        ...s,
-                        [item.id]: Math.max(0, (s[item.id] ?? 0) - 1),
-                      }))
-                    }
-                  >
-                    −
-                  </Button>
-                  <span className="w-6 text-center">{selected[item.id] ?? 0}</span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    type="button"
-                    onClick={() =>
-                      setSelected((s) => ({
-                        ...s,
-                        [item.id]: (s[item.id] ?? 0) + 1,
-                      }))
-                    }
-                  >
-                    +
-                  </Button>
+      {isChef && pendingRecipes > 0 && (
+        <Card className="space-y-2">
+          <CardTitle>Finish recipe setup first</CardTitle>
+          <p className="text-sm text-[var(--muted)]">
+            {pendingRecipes} dish{pendingRecipes === 1 ? "" : "es"} still need
+            grocery recipes finalized.
+          </p>
+          <Link
+            href="/recipes"
+            className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-fg)]"
+          >
+            Open recipe setup
+          </Link>
+        </Card>
+      )}
+
+      {!isChef && (
+        <Card className="space-y-3">
+          <CardTitle>New order</CardTitle>
+          <Input
+            value={tableNumber}
+            onChange={(e) => setTableNumber(e.target.value)}
+            placeholder="Table #"
+          />
+          <div className="max-h-48 space-y-2 overflow-y-auto">
+            {(menu.data?.menuItems ?? [])
+              .filter(
+                (item) =>
+                  item.isActive !== false &&
+                  item.menuApprovalStatus === "APPROVED",
+              )
+              .map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-2 text-sm"
+                >
+                  <span>{item.name}</span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      onClick={() =>
+                        setSelected((s) => ({
+                          ...s,
+                          [item.id]: Math.max(0, (s[item.id] ?? 0) - 1),
+                        }))
+                      }
+                    >
+                      −
+                    </Button>
+                    <span className="w-6 text-center">
+                      {selected[item.id] ?? 0}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      type="button"
+                      onClick={() =>
+                        setSelected((s) => ({
+                          ...s,
+                          [item.id]: (s[item.id] ?? 0) + 1,
+                        }))
+                      }
+                    >
+                      +
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-        </div>
-        <Button
-          disabled={items.length === 0 || create.isPending}
-          onClick={() => create.mutate()}
-        >
-          Send to kitchen
-        </Button>
-      </Card>
+              ))}
+          </div>
+          <Button
+            disabled={items.length === 0 || create.isPending}
+            onClick={() => create.mutate()}
+          >
+            Send to kitchen
+          </Button>
+        </Card>
+      )}
 
       <div className="space-y-2">
         {(orders.data?.orders ?? []).map((order) => (
@@ -187,6 +241,9 @@ export default function OrdersPage() {
             </div>
           </Card>
         ))}
+        {(orders.data?.orders ?? []).length === 0 && (
+          <p className="text-sm text-[var(--muted)]">No open tickets yet.</p>
+        )}
       </div>
     </div>
   );

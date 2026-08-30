@@ -61,7 +61,11 @@ export default function LoginPage() {
       setError(data.error ?? "Invalid code");
       return;
     }
-    router.push("/dashboard");
+    const role = data.user?.role as string | undefined;
+    if (role === "CHEF") router.push("/recipes");
+    else if (role === "WAITER") router.push("/orders");
+    else if (role === "STOCK_CLERK") router.push("/inventory");
+    else router.push("/dashboard");
     router.refresh();
   }
 
@@ -80,7 +84,11 @@ export default function LoginPage() {
       setError(data.error ?? "Login failed");
       return;
     }
-    router.push("/dashboard");
+    const role = data.user?.role as string | undefined;
+    if (role === "CHEF") router.push("/recipes");
+    else if (role === "WAITER") router.push("/orders");
+    else if (role === "STOCK_CLERK") router.push("/inventory");
+    else router.push("/dashboard");
     router.refresh();
   }
 

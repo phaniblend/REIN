@@ -59,7 +59,7 @@ export default function InviteAcceptPage() {
       return;
     }
     const role = data.user?.role as string | undefined;
-    if (role === "CHEF") router.push("/orders");
+    if (role === "CHEF") router.push("/recipes");
     else if (role === "WAITER") router.push("/orders");
     else router.push("/dashboard");
     router.refresh();

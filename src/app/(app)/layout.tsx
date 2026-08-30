@@ -23,6 +23,7 @@ export default async function AppLayout({
     <AppShell
       userName={session.name}
       restaurantName={restaurant?.name ?? "Restaurant"}
+      role={session.role}
     >
       {children}
     </AppShell>

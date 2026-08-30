@@ -1,6 +1,6 @@
 import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { menuItems, recipeBoms } from "@/db/schema";
+import { ingredients, menuItems, recipeBoms } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { z } from "zod";
@@ -33,8 +33,18 @@ export async function GET() {
   if (items.length === 0) return jsonOk({ menuItems: [] });
 
   const boms = await db
-    .select()
+    .select({
+      id: recipeBoms.id,
+      menuItemId: recipeBoms.menuItemId,
+      ingredientId: recipeBoms.ingredientId,
+      grossQuantity: recipeBoms.grossQuantity,
+      shrinkageMarginPercent: recipeBoms.shrinkageMarginPercent,
+      ingredientName: ingredients.name,
+      ingredientUnit: ingredients.unit,
+      ingredientCategory: ingredients.category,
+    })
     .from(recipeBoms)
+    .innerJoin(ingredients, eq(ingredients.id, recipeBoms.ingredientId))
     .where(
       inArray(
         recipeBoms.menuItemId,
