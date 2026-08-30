@@ -17,9 +17,26 @@ function detectStandalone() {
   );
 }
 
+function detectIos() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/iphone|ipad|ipod/i.test(ua)) return true;
+  return (
+    navigator.platform === "MacIntel" &&
+    typeof navigator.maxTouchPoints === "number" &&
+    navigator.maxTouchPoints > 1
+  );
+}
+
+function detectChromeIos() {
+  if (typeof navigator === "undefined") return false;
+  return /CriOS/i.test(navigator.userAgent);
+}
+
 /**
- * Always show iPhone steps — Apple has no install API, and UA detection is flaky.
- * Android still gets the native prompt when available.
+ * Android: native install when browser fires beforeinstallprompt.
+ * iPhone: Apple blocks install APIs — show Share → Add to Home Screen
+ * (works in Safari; Chrome iOS also has it under ⋯ → Share).
  */
 export function InstallAppButton({ className }: { className?: string }) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
@@ -27,12 +44,16 @@ export function InstallAppButton({ className }: { className?: string }) {
   );
   const [installed, setInstalled] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [ios, setIos] = useState(false);
+  const [chromeIos, setChromeIos] = useState(false);
 
   useEffect(() => {
     if (detectStandalone()) {
       setInstalled(true);
       return;
     }
+    setIos(detectIos());
+    setChromeIos(detectChromeIos());
 
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -86,39 +107,74 @@ export function InstallAppButton({ className }: { className?: string }) {
       ) : null}
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--tan)] px-4 py-4 text-sm text-[var(--fg)]">
-        <p className="font-[family-name:var(--font-display)] text-base font-semibold text-[var(--accent)]">
-          iPhone: add Restman to Home Screen
+        <p className="text-base font-semibold text-[var(--accent)]">
+          {ios
+            ? chromeIos
+              ? "Add from Chrome (iPhone)"
+              : "Add from Safari (iPhone)"
+            : "Add to your phone"}
         </p>
-        <p className="mt-1 text-xs text-[var(--muted)]">
-          Must use <strong>Safari</strong>. Chrome / Instagram in-app browsers
-          won’t show this option.
-        </p>
-        <ol className="mt-3 list-decimal space-y-2.5 pl-5">
-          <li>
-            Tap the{" "}
-            <Share
-              className="mx-0.5 inline h-4 w-4 align-text-bottom text-[var(--accent)]"
-              aria-hidden
-            />{" "}
-            <strong>Share</strong> button (square with ↑) in Safari’s toolbar
-          </li>
-          <li>
-            <strong>Scroll down</strong> the share sheet — past AirDrop / apps —
-            until you see{" "}
-            <PlusSquare
-              className="mx-0.5 inline h-4 w-4 align-text-bottom text-[var(--accent)]"
-              aria-hidden
-            />{" "}
-            <strong>Add to Home Screen</strong>
-          </li>
-          <li>
-            If it’s missing: tap <strong>Edit Actions…</strong> → enable{" "}
-            <strong>Add to Home Screen</strong> → Done, then tap it
-          </li>
-          <li>
-            Tap <strong>Add</strong> in the top right
-          </li>
-        </ol>
+
+        {ios && chromeIos ? (
+          <>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Chrome on iPhone can’t show a one-tap install button (Apple
+              limitation). Use Share inside Chrome — or open this page in Safari.
+            </p>
+            <ol className="mt-3 list-decimal space-y-2.5 pl-5">
+              <li>
+                Tap <strong>⋯</strong> (menu) at the bottom right
+              </li>
+              <li>
+                Tap <strong>Share…</strong>
+              </li>
+              <li>
+                Scroll and tap{" "}
+                <PlusSquare
+                  className="mx-0.5 inline h-4 w-4 align-text-bottom text-[var(--accent)]"
+                  aria-hidden
+                />{" "}
+                <strong>Add to Home Screen</strong>
+              </li>
+              <li>
+                Tap <strong>Add</strong>
+              </li>
+            </ol>
+          </>
+        ) : (
+          <>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              {ios
+                ? "Apple doesn’t allow one-tap install from the page. Use Safari’s Share sheet."
+                : "On Android Chrome, use Install app above when it appears. On iPhone, use the steps below in Safari or Chrome."}
+            </p>
+            <ol className="mt-3 list-decimal space-y-2.5 pl-5">
+              <li>
+                Tap{" "}
+                <Share
+                  className="mx-0.5 inline h-4 w-4 align-text-bottom text-[var(--accent)]"
+                  aria-hidden
+                />{" "}
+                <strong>Share</strong> (Safari toolbar)
+              </li>
+              <li>
+                <strong>Scroll down</strong> past AirDrop / apps until{" "}
+                <PlusSquare
+                  className="mx-0.5 inline h-4 w-4 align-text-bottom text-[var(--accent)]"
+                  aria-hidden
+                />{" "}
+                <strong>Add to Home Screen</strong>
+              </li>
+              <li>
+                Missing? <strong>Edit Actions…</strong> → enable it → Done → tap
+                it
+              </li>
+              <li>
+                Tap <strong>Add</strong>
+              </li>
+            </ol>
+          </>
+        )}
       </div>
     </div>
   );
