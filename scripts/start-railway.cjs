@@ -23,10 +23,14 @@ run("npx", ["drizzle-kit", "push", "--force"]);
 const standalone = path.join(process.cwd(), ".next", "standalone", "server.js");
 if (fs.existsSync(standalone)) {
   console.log("→ next standalone");
+  // Railway sets HOSTNAME to the container id; Next binds to that and the
+  // edge proxy cannot reach the app (502). Force all-interfaces bind.
+  process.env.HOSTNAME = "0.0.0.0";
+  process.env.PORT = process.env.PORT || "3000";
   // standalone server expects assets relative to its folder
   process.chdir(path.dirname(standalone));
   require(standalone);
 } else {
   console.log("→ next start");
-  run("npx", ["next", "start", "-p", process.env.PORT || "3000"]);
+  run("npx", ["next", "start", "-H", "0.0.0.0", "-p", process.env.PORT || "3000"]);
 }
