@@ -9,18 +9,6 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-function detectIos() {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  if (/iphone|ipad|ipod/i.test(ua)) return true;
-  // iPadOS 13+ can report as Mac
-  return (
-    navigator.platform === "MacIntel" &&
-    typeof navigator.maxTouchPoints === "number" &&
-    navigator.maxTouchPoints > 1
-  );
-}
-
 function detectStandalone() {
   if (typeof window === "undefined") return false;
   return (
@@ -29,23 +17,22 @@ function detectStandalone() {
   );
 }
 
+/**
+ * Always show iPhone steps — Apple has no install API, and UA detection is flaky.
+ * Android still gets the native prompt when available.
+ */
 export function InstallAppButton({ className }: { className?: string }) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
     null,
   );
   const [installed, setInstalled] = useState(false);
-  const [isIos, setIsIos] = useState(false);
-  const [showHowTo, setShowHowTo] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setReady(true);
     if (detectStandalone()) {
       setInstalled(true);
       return;
     }
-    setIsIos(detectIos());
 
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -54,7 +41,6 @@ export function InstallAppButton({ className }: { className?: string }) {
     const onInstalled = () => {
       setInstalled(true);
       setDeferred(null);
-      setShowHowTo(false);
     };
 
     window.addEventListener("beforeinstallprompt", onPrompt);
@@ -65,17 +51,6 @@ export function InstallAppButton({ className }: { className?: string }) {
     };
   }, []);
 
-  if (!ready) {
-    return (
-      <div
-        className={cn(
-          "h-12 w-full animate-pulse rounded-full bg-[var(--accent-soft)]",
-          className,
-        )}
-      />
-    );
-  }
-
   if (installed) {
     return (
       <p className="rounded-2xl bg-[var(--tan)] px-4 py-3 text-center text-sm text-[var(--accent)]">
@@ -85,93 +60,70 @@ export function InstallAppButton({ className }: { className?: string }) {
   }
 
   async function onInstallClick() {
-    // Android / desktop Chromium
-    if (deferred) {
-      setBusy(true);
-      try {
-        await deferred.prompt();
-        await deferred.userChoice;
-      } finally {
-        setDeferred(null);
-        setBusy(false);
-      }
-      return;
+    if (!deferred) return;
+    setBusy(true);
+    try {
+      await deferred.prompt();
+      await deferred.userChoice;
+    } finally {
+      setDeferred(null);
+      setBusy(false);
     }
-
-    // iPhone / iPad — Apple does not allow a native install API
-    setShowHowTo(true);
   }
 
   return (
     <div className={cn("space-y-3", className)}>
-      <button
-        type="button"
-        onClick={onInstallClick}
-        disabled={busy}
-        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-6 text-base font-medium text-[var(--accent-fg)] active:opacity-90"
-      >
-        <Download className="h-4 w-4" aria-hidden />
-        {busy
-          ? "Installing…"
-          : isIos
-            ? "Add to Home Screen"
-            : deferred
-              ? "Install app"
-              : "Install app"}
-      </button>
+      {deferred ? (
+        <button
+          type="button"
+          onClick={onInstallClick}
+          disabled={busy}
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-6 text-base font-medium text-[var(--accent-fg)] active:opacity-90"
+        >
+          <Download className="h-4 w-4" aria-hidden />
+          {busy ? "Installing…" : "Install app"}
+        </button>
+      ) : null}
 
-      {(showHowTo || isIos) && (
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--tan)] px-4 py-3 text-sm text-[var(--fg)]">
-          {isIos ? (
-            <>
-              <p className="font-medium text-[var(--accent)]">
-                iPhone / iPad — Safari only
-              </p>
-              <ol className="mt-2 list-decimal space-y-2 pl-5 text-[var(--fg)]">
-                <li className="flex flex-wrap items-center gap-1">
-                  Tap <Share className="inline h-4 w-4 text-[var(--accent)]" aria-hidden />{" "}
-                  <strong>Share</strong> at the bottom of Safari
-                </li>
-                <li className="flex flex-wrap items-center gap-1">
-                  Scroll and tap{" "}
-                  <PlusSquare className="inline h-4 w-4 text-[var(--accent)]" aria-hidden />{" "}
-                  <strong>Add to Home Screen</strong>
-                </li>
-                <li>
-                  Tap <strong>Add</strong> — Restman appears like an app
-                </li>
-              </ol>
-              <p className="mt-2 text-xs text-[var(--muted)]">
-                Apple doesn’t allow one-tap install from the page. If you don’t
-                see Share, open this site in Safari (not Chrome/Instagram).
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="font-medium text-[var(--accent)]">Install from your browser</p>
-              <p className="mt-1 text-[var(--muted)]">
-                Use the browser menu → <strong>Install app</strong> or{" "}
-                <strong>Add to Home screen</strong>. On Android Chrome the
-                install banner may also appear at the top.
-              </p>
-            </>
-          )}
-          {showHowTo && !isIos && (
-            <button
-              type="button"
-              className="mt-2 text-xs text-[var(--accent)] underline"
-              onClick={() => setShowHowTo(false)}
-            >
-              Dismiss
-            </button>
-          )}
-        </div>
-      )}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--tan)] px-4 py-4 text-sm text-[var(--fg)]">
+        <p className="font-[family-name:var(--font-display)] text-base font-semibold text-[var(--accent)]">
+          iPhone: add Restman to Home Screen
+        </p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
+          Must use <strong>Safari</strong>. Chrome / Instagram in-app browsers
+          won’t show this option.
+        </p>
+        <ol className="mt-3 list-decimal space-y-2.5 pl-5">
+          <li>
+            Tap the{" "}
+            <Share
+              className="mx-0.5 inline h-4 w-4 align-text-bottom text-[var(--accent)]"
+              aria-hidden
+            />{" "}
+            <strong>Share</strong> button (square with ↑) in Safari’s toolbar
+          </li>
+          <li>
+            <strong>Scroll down</strong> the share sheet — past AirDrop / apps —
+            until you see{" "}
+            <PlusSquare
+              className="mx-0.5 inline h-4 w-4 align-text-bottom text-[var(--accent)]"
+              aria-hidden
+            />{" "}
+            <strong>Add to Home Screen</strong>
+          </li>
+          <li>
+            If it’s missing: tap <strong>Edit Actions…</strong> → enable{" "}
+            <strong>Add to Home Screen</strong> → Done, then tap it
+          </li>
+          <li>
+            Tap <strong>Add</strong> in the top right
+          </li>
+        </ol>
+      </div>
     </div>
   );
 }
 
-/** Registers the service worker once on the client. */
 export function PwaRegister() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
