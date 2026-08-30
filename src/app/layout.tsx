@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit, Space_Grotesk } from "next/font/google";
 import { QueryProvider } from "@/components/providers";
+import { PwaRegister } from "@/components/install-app";
 import "./globals.css";
 
 const body = Outfit({
@@ -24,6 +25,10 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Restman",
   },
+  icons: {
+    icon: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+    apple: [{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -42,6 +47,7 @@ export default function RootLayout({
     <html lang="en" className={`${body.variable} ${display.variable} h-full`}>
       <body className="min-h-full antialiased">
         <QueryProvider>{children}</QueryProvider>
+        <PwaRegister />
       </body>
     </html>
   );

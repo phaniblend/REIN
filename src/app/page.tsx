@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { RestmanLogo } from "@/components/restman-logo";
+import { InstallAppButton } from "@/components/install-app";
 import { DataAlert, MiniBarChart, StatTile } from "@/components/ui/data-viz";
 
 export default function HomePage() {
@@ -15,24 +16,27 @@ export default function HomePage() {
             Know what your kitchen uses. Stop what it wastes.
           </h1>
           <p className="max-w-[36ch] text-[var(--muted)]">
-            Owners sign up with a text code, invite waiters and chefs by secure
-            link, and track what sold — Restman keeps shrink off your P&amp;L.
+            Install Restman on your phone, sign up with a text code, then invite
+            waiters and chefs by link — no staff self-registration.
           </p>
         </div>
 
-        <div className="flex gap-3">
-          <Link
-            href="/register"
-            className="inline-flex h-12 flex-1 items-center justify-center rounded-full bg-[var(--accent)] px-6 text-base font-medium text-[var(--accent-fg)]"
-          >
-            Owner sign up
-          </Link>
-          <Link
-            href="/login"
-            className="inline-flex h-12 flex-1 items-center justify-center rounded-full border border-[var(--fg)] bg-[var(--surface)] px-6 text-base font-medium"
-          >
-            Sign in
-          </Link>
+        <div className="space-y-3">
+          <InstallAppButton />
+          <div className="flex gap-3">
+            <Link
+              href="/register"
+              className="inline-flex h-12 flex-1 items-center justify-center rounded-full border border-[var(--fg)] bg-[var(--surface)] px-6 text-base font-medium"
+            >
+              Owner sign up
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex h-12 flex-1 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] px-6 text-base font-medium text-[var(--muted)]"
+            >
+              Sign in
+            </Link>
+          </div>
         </div>
 
         <div className="space-y-3 rounded-[1.75rem] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_8px_30px_rgba(38,71,53,0.06)]">
@@ -57,7 +61,7 @@ export default function HomePage() {
       </div>
 
       <p className="relative text-xs text-[var(--muted)]">
-        restman · daily stock · mobile-first PWA
+        restman · install on phone · daily stock PWA
       </p>
     </div>
   );

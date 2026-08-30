@@ -1,12 +1,26 @@
 {
   "name": "Restman",
   "short_name": "Restman",
-  "description": "Restaurant manager for inventory, AvT yield, and Gemini menu insights",
-  "start_url": "/dashboard",
+  "description": "Restaurant manager — owners invite staff by link, track what sold, cut shrink.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#f9f7f2",
   "theme_color": "#264735",
   "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/icons/icon.svg",
       "sizes": "any",
