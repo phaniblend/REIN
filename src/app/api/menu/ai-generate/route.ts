@@ -116,7 +116,7 @@ export async function POST(request: Request) {
     }
     console.error(err);
     const message =
-      err instanceof Error ? err.message : "Gemini menu generation failed";
+      err instanceof Error ? err.message : "Menu generation failed";
     return jsonError(message, 500);
   }
 }

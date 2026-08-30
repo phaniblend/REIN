@@ -53,8 +53,8 @@ export default function InsightsPage() {
           Area cuisine averages
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Gemini estimates for same-cuisine restaurants in your city — not
-          competitor-specific POS data.
+          Typical same-cuisine averages for your city — not competitor-specific
+          POS data.
         </p>
       </div>
 
@@ -64,7 +64,7 @@ export default function InsightsPage() {
           Uses your restaurant cuisine + city from registration.
         </p>
         <Button onClick={() => load.mutate()} disabled={load.isPending}>
-          {load.isPending ? "Asking Gemini…" : "Refresh area benchmarks"}
+          {load.isPending ? "Loading…" : "Refresh area benchmarks"}
         </Button>
         {load.error && (
           <p className="text-sm text-[var(--danger)]">

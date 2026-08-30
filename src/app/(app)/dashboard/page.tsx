@@ -131,7 +131,7 @@ export default function DashboardPage() {
           href="/menu"
           className="rounded-2xl border border-[var(--fg)] bg-[var(--surface)] px-4 py-3 text-sm font-medium"
         >
-          Autofill menu with Gemini →
+          Generate recommended menu →
         </Link>
         <Link
           href="/insights"

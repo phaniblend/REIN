@@ -80,7 +80,7 @@ async function generateJson<T>(prompt: string, schema: z.ZodType<T>): Promise<T>
     parsed = JSON.parse(text);
   } catch {
     const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error("Gemini returned non-JSON content");
+    if (!match) throw new Error("Menu generation returned invalid content");
     parsed = JSON.parse(match[0]);
   }
   return schema.parse(parsed);

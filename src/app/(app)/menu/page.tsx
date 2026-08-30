@@ -64,12 +64,12 @@ export default function MenuPage() {
           Menu & recipes
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Gemini autofills dishes and portion BOMs for yield tracking.
+          Generate a recommended menu with portion recipes for yield tracking.
         </p>
       </div>
 
       <Card className="space-y-3">
-        <CardTitle>Autofill with Gemini</CardTitle>
+        <CardTitle>Recommended menu</CardTitle>
         <Input
           placeholder="Optional focus (e.g. weekend brunch, high-protein)"
           value={focus}
@@ -82,7 +82,7 @@ export default function MenuPage() {
           }}
           disabled={generate.isPending}
         >
-          {generate.isPending ? "Generating…" : "Generate menu + recipes"}
+          {generate.isPending ? "Generating…" : "Generate recommended menu"}
         </Button>
         {message && <p className="text-sm text-[var(--muted)]">{message}</p>}
       </Card>
@@ -107,7 +107,7 @@ export default function MenuPage() {
         ))}
         {items.length === 0 && (
           <p className="text-sm text-[var(--muted)]">
-            No menu yet — generate with Gemini to seed dishes and BOMs.
+            No menu yet — generate a recommended menu to get started.
           </p>
         )}
       </div>
