@@ -12,8 +12,9 @@
 | `TWILIO_AUTH_TOKEN` | Twilio Auth Token |
 | `TWILIO_FROM_NUMBER` | Twilio number in E.164 (`+15551234567`) |
 | `SMS_PROVIDER` | Optional: `twilio` or `console` (logs codes; default auto) |
+| `NEXT_PUBLIC_APP_URL` | Public site URL (e.g. `https://www.restman.live`) for staff invite links |
 
-Without Twilio vars, OTP codes are logged to Railway logs and returned as `devCode` in the API so you can still test.
+Without Twilio vars, OTP codes are logged to Railway logs and returned as `devCode` in the API so you can still test. Staff invite links are also returned in the Team UI so you can copy/share them.
 
 ## Remove if present (causes npm E401)
 

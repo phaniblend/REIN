@@ -10,6 +10,7 @@ import {
   Package,
   Scale,
   Trash2,
+  Users,
   UtensilsCrossed,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ import { RestmanLogo } from "@/components/restman-logo";
 
 const links = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+  { href: "/team", label: "Team", icon: Users },
   { href: "/inventory", label: "Stock", icon: Package },
   { href: "/menu", label: "Menu", icon: UtensilsCrossed },
   { href: "/orders", label: "POS", icon: ClipboardList },
@@ -63,7 +65,7 @@ export function AppShell({
       <main className="flex-1 px-4 py-4">{children}</main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--border)] bg-[color-mix(in_oklab,var(--bg)_92%,transparent)] backdrop-blur-md">
-        <div className="mx-auto grid max-w-lg grid-cols-7 gap-0.5 px-1 py-1.5">
+        <div className="mx-auto grid max-w-lg grid-cols-4 gap-0.5 px-1 py-1.5 sm:grid-cols-8">
           {links.map(({ href, label, icon: Icon }) => {
             const active = pathname.startsWith(href);
             return (

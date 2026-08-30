@@ -43,8 +43,8 @@ export async function POST(request: Request) {
         .from(users)
         .where(eq(users.phone, phone))
         .limit(1);
-      if (!user || user.role !== "OWNER") {
-        return jsonError("No owner account for that mobile", 404);
+      if (!user) {
+        return jsonError("No account for that mobile number", 404);
       }
 
       const token = await createSessionToken({

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { RestmanLogo } from "@/components/restman-logo";
-import { MiniBarChart, StatTile, DataAlert } from "@/components/ui/data-viz";
+import { DataAlert, MiniBarChart, StatTile } from "@/components/ui/data-viz";
 
 export default function HomePage() {
   return (
@@ -15,8 +15,8 @@ export default function HomePage() {
             Know what your kitchen uses. Stop what it wastes.
           </h1>
           <p className="max-w-[36ch] text-[var(--muted)]">
-            Blind shift counts, Actual vs Theoretical variance, and Gemini-assisted
-            menu BOMs — Restman keeps unexplained shrink off your P&amp;L.
+            Owners sign up with a text code, invite waiters and chefs by secure
+            link, and track what sold — Restman keeps shrink off your P&amp;L.
           </p>
         </div>
 
@@ -25,7 +25,7 @@ export default function HomePage() {
             href="/register"
             className="inline-flex h-12 flex-1 items-center justify-center rounded-full bg-[var(--accent)] px-6 text-base font-medium text-[var(--accent-fg)]"
           >
-            Explore the workflow
+            Owner sign up
           </Link>
           <Link
             href="/login"

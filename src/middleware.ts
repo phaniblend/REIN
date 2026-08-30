@@ -7,6 +7,8 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic =
     publicPaths.includes(pathname) ||
+    pathname.startsWith("/invite/") ||
+    pathname.startsWith("/api/invite/") ||
     pathname.startsWith("/api/auth/login") ||
     pathname.startsWith("/api/auth/register") ||
     pathname.startsWith("/api/auth/otp");
@@ -19,7 +21,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (session && (pathname === "/login" || pathname === "/register" || pathname === "/")) {
+  if (
+    session &&
+    (pathname === "/login" ||
+      pathname === "/register" ||
+      pathname === "/")
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

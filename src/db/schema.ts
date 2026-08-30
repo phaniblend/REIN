@@ -93,13 +93,42 @@ export const otpChallenges = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     phone: text("phone").notNull(),
     codeHash: text("code_hash").notNull(),
-    purpose: text("purpose").notNull(), // login | register
-    payload: text("payload"), // JSON for pending registration
+    purpose: text("purpose").notNull(), // login | register | invite
+    payload: text("payload"), // JSON for pending registration / invite
     attempts: numeric("attempts", { precision: 2, scale: 0 }).default("0").notNull(),
     expiresAt: timestamp("expires_at").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("otp_phone_idx").on(t.phone)],
+);
+
+/** Owner-issued staff join links — no staff self-registration */
+export const staffInvites = pgTable(
+  "staff_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    invitedByUserId: uuid("invited_by_user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    phone: text("phone").notNull(),
+    name: text("name"),
+    role: roleEnum("role").notNull(),
+    token: text("token").notNull().unique(),
+    acceptedAt: timestamp("accepted_at"),
+    acceptedUserId: uuid("accepted_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("staff_invites_restaurant_idx").on(t.restaurantId),
+    index("staff_invites_token_idx").on(t.token),
+    index("staff_invites_phone_idx").on(t.phone),
+  ],
 );
 
 export const ingredients = pgTable(
