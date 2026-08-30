@@ -7,14 +7,14 @@ export default function HomePage() {
 
       <div className="relative animate-rise space-y-6 pt-8">
         <p className="font-[family-name:var(--font-display)] text-5xl font-semibold tracking-tight text-[var(--fg)]">
-          KitchenYield
+          Restman
         </p>
-        <h1 className="max-w-[16ch] text-2xl font-medium leading-snug text-[var(--fg)]">
-          Close the loop between purchases, recipes, and unexplained shrink.
+        <h1 className="max-w-[18ch] text-2xl font-medium leading-snug text-[var(--fg)]">
+          The restaurant manager that saves your margins.
         </h1>
-        <p className="max-w-[34ch] text-[var(--muted)]">
+        <p className="max-w-[36ch] text-[var(--muted)]">
           Blind shift counts, Actual vs Theoretical variance, and Gemini-assisted
-          menu BOMs for your kitchen.
+          menu BOMs — inventory control for operators who refuse unexplained shrink.
         </p>
         <div className="flex gap-3 pt-2">
           <Link
@@ -33,7 +33,7 @@ export default function HomePage() {
       </div>
 
       <p className="relative text-xs text-[var(--muted)]">
-        Mobile-first PWA · PostgreSQL · Gemini recipe & area benchmarks
+        Mobile-first PWA · PostgreSQL · Gemini recipes & area benchmarks
       </p>
     </div>
   );

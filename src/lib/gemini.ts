@@ -100,7 +100,7 @@ export async function suggestMenuAndRecipes(input: {
   const count = input.count ?? 6;
   const location = [input.city, input.region, input.country].filter(Boolean).join(", ");
 
-  const prompt = `You are a restaurant culinary ops assistant for KitchenYield.
+  const prompt = `You are a restaurant culinary ops assistant for Restman.
 Return ONLY valid JSON matching this TypeScript shape:
 {
   "items": [{
@@ -141,7 +141,7 @@ export async function getLocationCuisineStats(input: {
     .filter(Boolean)
     .join(", ");
 
-  const prompt = `You are a restaurant industry analyst for KitchenYield.
+  const prompt = `You are a restaurant industry analyst for Restman.
 Produce AGGREGATE, ANONYMIZED market averages for restaurants of the same cuisine in this location.
 Do NOT invent named competitor restaurants. Do NOT claim access to private POS data.
 Label confidence honestly. Prefer public industry norms + location cost-of-living adjustments.

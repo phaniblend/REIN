@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const links = [
-  { href: "/dashboard", label: "Yield", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/inventory", label: "Stock", icon: Package },
   { href: "/menu", label: "Menu", icon: UtensilsCrossed },
   { href: "/orders", label: "POS", icon: ClipboardList },
@@ -50,7 +50,7 @@ export function AppShell({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="font-[family-name:var(--font-display)] text-xl leading-none tracking-tight">
-              KitchenYield
+              Restman
             </p>
             <p className="mt-1 truncate text-xs text-[var(--muted)]">
               {restaurantName} · {userName}

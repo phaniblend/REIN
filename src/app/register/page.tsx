@@ -50,11 +50,11 @@ export default function RegisterPage() {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-4 py-8">
       <p className="mb-4 font-[family-name:var(--font-display)] text-3xl font-semibold">
-        KitchenYield
+        Restman
       </p>
       <Card className="animate-rise space-y-4">
         <div>
-          <h1 className="text-xl font-medium">Open your kitchen</h1>
+          <h1 className="text-xl font-medium">Open with Restman</h1>
           <p className="text-sm text-[var(--muted)]">
             Owner account + restaurant profile for local cuisine benchmarks.
           </p>
@@ -141,7 +141,7 @@ export default function RegisterPage() {
           </div>
           {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
           <Button type="submit" disabled={loading}>
-            {loading ? "Creating…" : "Create kitchen"}
+            {loading ? "Creating…" : "Create Restman account"}
           </Button>
         </form>
         <p className="text-sm text-[var(--muted)]">

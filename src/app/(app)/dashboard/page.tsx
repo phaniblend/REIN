@@ -62,7 +62,7 @@ export default function DashboardPage() {
     <div className="animate-rise space-y-4">
       <div>
         <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
-          Yield pulse
+          Ops pulse
         </h1>
         <p className="text-sm text-[var(--muted)]">
           {me.data?.restaurant?.cuisineType} · {me.data?.restaurant?.city}

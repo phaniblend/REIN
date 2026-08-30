@@ -37,7 +37,7 @@ export default function LoginPage() {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-lg flex-col justify-center px-4 py-10">
       <p className="mb-6 font-[family-name:var(--font-display)] text-3xl font-semibold">
-        KitchenYield
+        Restman
       </p>
       <Card className="animate-rise space-y-4">
         <h1 className="text-xl font-medium">Sign in</h1>
@@ -70,9 +70,9 @@ export default function LoginPage() {
           </Button>
         </form>
         <p className="text-sm text-[var(--muted)]">
-          New kitchen?{" "}
+          New restaurant?{" "}
           <Link href="/register" className="text-[var(--accent)] underline">
-            Register restaurant
+            Register with Restman
           </Link>
         </p>
       </Card>

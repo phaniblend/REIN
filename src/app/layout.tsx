@@ -14,15 +14,15 @@ const display = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "KitchenYield",
+  title: "Restman",
   description:
-    "Restaurant inventory, ROI, and yield-loss management — Actual vs Theoretical.",
-  applicationName: "KitchenYield",
+    "Restaurant manager for inventory, ROI, and yield-loss — Actual vs Theoretical.",
+  applicationName: "Restman",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "KitchenYield",
+    title: "Restman",
   },
 };
 

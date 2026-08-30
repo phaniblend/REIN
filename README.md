@@ -1,6 +1,8 @@
-# REIN / KitchenYield
+# REIN / Restman
 
-Restaurant inventory, Actual-vs-Theoretical yield, POS, and Gemini-assisted menu + area cuisine stats.
+**Restman** — restaurant manager (inspired by Superman: the ops savior). Short for restaurant mgr.
+
+Inventory, Actual-vs-Theoretical yield, POS, and Gemini-assisted menu + area cuisine stats.
 
 ## Architecture (one repo)
 
@@ -27,41 +29,31 @@ REIN (this repo)
 1. **Web** — this Next.js app (connect GitHub `REIN`)
 2. **Postgres** — Railway plugin; `DATABASE_URL` is injected automatically
 
-No separate Vercel frontend, no separate Express API, no second GitHub repo.
-
-## Env vars (you set on Railway Web service)
+## Env vars (Railway Web service)
 
 | Var | Notes |
 |-----|--------|
-| `DATABASE_URL` | Usually auto from Postgres plugin |
-| `GEMINI_API_KEY` | From Google AI Studio |
+| `DATABASE_URL` | From Postgres plugin |
+| `GEMINI_API_KEY` | Google AI Studio |
 | `GEMINI_MODEL` | `gemini-2.5-flash` (optional) |
 | `AUTH_SECRET` | Long random string |
-| `NEXT_PUBLIC_APP_NAME` | `KitchenYield` (optional) |
+| `NEXT_PUBLIC_APP_NAME` | `Restman` (optional) |
 
 ## Local
 
 ```bash
 npm install
-npm run db:up          # Docker Desktop required
-# ensure .env.local has DATABASE_URL + GEMINI_API_KEY + AUTH_SECRET
+npm run db:up
 npm run db:push
 npm run dev
 ```
 
-## Railway deploy (your side)
-
-1. New project → add **PostgreSQL**
-2. New service from **this GitHub repo**
-3. Variables: link `DATABASE_URL` from Postgres; add `GEMINI_API_KEY`, `AUTH_SECRET`
-4. Deploy — `railway.json` runs `npm run build` then `npm run start:railway` (schema push + Next start)
-
 ## App surfaces
 
-- **Yield** — stock value, below-par, shortcuts
+- **Home** — stock value, below-par, shortcuts
 - **Stock** — ingredients + purchase receipts
 - **Menu** — CRUD + Gemini autofill recipes/BOMs
-- **POS** — table tickets → drives theoretical usage
+- **POS** — table tickets → theoretical usage
 - **Count** — blind shift count → AvT reconciliation
 - **Waste** — categorized spoilage / returns
-- **Area** — Gemini same-cuisine grocery bought-vs-sold averages for your city
+- **Area** — Gemini same-cuisine grocery bought-vs-sold averages
