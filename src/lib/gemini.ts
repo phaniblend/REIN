@@ -58,10 +58,13 @@ function resolveApiKey() {
     process.env.GOOGLE_API_KEY ||
     process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
     "";
-  const key = raw.trim().replace(/^["']|["']$/g, "").replace(/^Bearer\s+/i, "");
+  const key = raw
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/^Bearer\s+/i, "");
   if (!key) {
     throw new Error(
-      "Menu generation is not configured. Set GEMINI_API_KEY on the server.",
+      "Menu generation is not configured. Set GEMINI_API_KEY on Railway.",
     );
   }
   return key;
@@ -79,10 +82,14 @@ function modelCandidates() {
 }
 
 function friendlyAuthError() {
-  return "Menu generation auth failed. On Railway, set GEMINI_API_KEY to a key from Google AI Studio (aistudio.google.com/apikey), then redeploy.";
+  return "Menu generation auth failed. Set GEMINI_API_KEY on Railway to a key from https://aistudio.google.com/apikey (full key, no quotes), then redeploy.";
 }
 
-async function generateContentOnce(model: string, prompt: string, apiKey: string) {
+async function generateContentOnce(
+  model: string,
+  prompt: string,
+  apiKey: string,
+) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const res = await fetch(url, {
     method: "POST",
@@ -124,8 +131,7 @@ async function generateContentOnce(model: string, prompt: string, apiKey: string
       throw new Error(friendlyAuthError());
     }
     if (code === 404 || /not found|no longer available/i.test(msg)) {
-      const err = new Error(`MODEL_UNAVAILABLE:${model}`);
-      throw err;
+      throw new Error(`MODEL_UNAVAILABLE:${model}`);
     }
     if (code === 429) {
       throw new Error("Menu generation is rate-limited. Try again in a minute.");
@@ -189,16 +195,16 @@ export async function suggestMenuAndRecipes(input: {
     .filter(Boolean)
     .join(", ");
 
-  const prompt = `You are a restaurant culinary ops assistant.
-Return ONLY valid JSON matching this shape:
+  const prompt = `You are a restaurant culinary ops assistant for Restman.
+Return ONLY valid JSON matching this TypeScript shape:
 {
   "items": [{
     "name": string,
-    "category": string,
+    "category": "Starters" | "Main Course" | "Breads" | "Desserts" | "Beverages" | string,
     "sellingPrice": number,
     "ingredients": [{
       "name": string,
-      "category": string,
+      "category": "Proteins" | "Dairy" | "Vegetables" | "Dry Goods" | "Spices" | "Oils" | string,
       "unit": "KG" | "G" | "L" | "ML" | "PIECE" | "PACKET",
       "grossQuantity": number,
       "shrinkageMarginPercent": number,
@@ -211,9 +217,11 @@ Restaurant: ${input.restaurantName}
 Cuisine: ${input.cuisineType}
 Location: ${location || "unspecified"}
 Currency: ${input.currency ?? "USD"}
-Existing ingredients to prefer: ${(input.existingIngredients ?? []).join(", ") || "none"}
-Focus: ${input.focus ?? "signature dishes with measurable portion recipes"}
-Generate exactly ${count} menu items with realistic portion recipes for kitchen yield tracking.`;
+Existing ingredients to prefer when relevant: ${(input.existingIngredients ?? []).join(", ") || "none"}
+Focus: ${input.focus ?? "signature dishes with measurable BOM yield"}
+Generate exactly ${count} menu items with realistic portion BOMs for kitchen yield tracking.
+Use practical units (G/ML for portion-level, KG/L for bulk proteins/oils when per-portion amounts are large).
+Prices and costs should be realistic for the location.`;
 
   return generateJson(prompt, menuRecipeSuggestionSchema);
 }
@@ -228,9 +236,10 @@ export async function getLocationCuisineStats(input: {
     .filter(Boolean)
     .join(", ");
 
-  const prompt = `You are a restaurant industry analyst.
+  const prompt = `You are a restaurant industry analyst for Restman.
 Produce AGGREGATE, ANONYMIZED market averages for restaurants of the same cuisine in this location.
 Do NOT invent named competitor restaurants. Do NOT claim access to private POS data.
+Label confidence honestly.
 
 Return ONLY JSON:
 {
