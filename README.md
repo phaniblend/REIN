@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# REIN / KitchenYield
 
-## Getting Started
+Restaurant inventory, Actual-vs-Theoretical yield, POS, and Gemini-assisted menu + area cuisine stats.
 
-First, run the development server:
+## Architecture (one repo)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+You do **not** need separate FE / BE / service repos.
+
+| Piece | Where it lives | Railway |
+|-------|----------------|---------|
+| Frontend (PWA UI) | `src/app/**` pages | same web service |
+| Backend (API) | `src/app/api/**` route handlers | same web service |
+| DB schema / AvT / Gemini | `src/db`, `src/lib` | same web service |
+| PostgreSQL | managed | **Postgres plugin** (separate service, same project) |
+
+```
+REIN (this repo)
+└── Next.js (standalone)
+    ├── UI  /dashboard /menu /inventory /orders /shifts /wastage /insights
+    ├── API /api/auth /api/menu /api/ingredients /api/orders …
+    └── Gemini server calls (menu autofill + location averages)
+         │
+         └── DATABASE_URL ──► Railway Postgres
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Hosting = 2 Railway services in 1 project:**
+1. **Web** — this Next.js app (connect GitHub `REIN`)
+2. **Postgres** — Railway plugin; `DATABASE_URL` is injected automatically
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+No separate Vercel frontend, no separate Express API, no second GitHub repo.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Env vars (you set on Railway Web service)
 
-## Learn More
+| Var | Notes |
+|-----|--------|
+| `DATABASE_URL` | Usually auto from Postgres plugin |
+| `GEMINI_API_KEY` | From Google AI Studio |
+| `GEMINI_MODEL` | `gemini-2.5-flash` (optional) |
+| `AUTH_SECRET` | Long random string |
+| `NEXT_PUBLIC_APP_NAME` | `KitchenYield` (optional) |
 
-To learn more about Next.js, take a look at the following resources:
+## Local
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+npm run db:up          # Docker Desktop required
+# ensure .env.local has DATABASE_URL + GEMINI_API_KEY + AUTH_SECRET
+npm run db:push
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Railway deploy (your side)
 
-## Deploy on Vercel
+1. New project → add **PostgreSQL**
+2. New service from **this GitHub repo**
+3. Variables: link `DATABASE_URL` from Postgres; add `GEMINI_API_KEY`, `AUTH_SECRET`
+4. Deploy — `railway.json` runs `npm run build` then `npm run start:railway` (schema push + Next start)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## App surfaces
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Yield** — stock value, below-par, shortcuts
+- **Stock** — ingredients + purchase receipts
+- **Menu** — CRUD + Gemini autofill recipes/BOMs
+- **POS** — table tickets → drives theoretical usage
+- **Count** — blind shift count → AvT reconciliation
+- **Waste** — categorized spoilage / returns
+- **Area** — Gemini same-cuisine grocery bought-vs-sold averages for your city

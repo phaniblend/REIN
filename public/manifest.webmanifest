@@ -1,0 +1,17 @@
+{
+  "name": "KitchenYield",
+  "short_name": "KitchenYield",
+  "description": "Restaurant inventory, AvT yield, and Gemini menu insights",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#e8eef3",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,135 @@
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { Card, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { money, num } from "@/lib/utils";
+
+type Ingredient = {
+  id: string;
+  name: string;
+  unit: string;
+  currentStock: string;
+  parLevel: string | null;
+  costPerUnit: string;
+};
+
+export default function DashboardPage() {
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      if (!res.ok) throw new Error("Unauthorized");
+      return res.json() as Promise<{
+        restaurant: {
+          cuisineType: string;
+          city: string;
+          region: string;
+          currency: string;
+        };
+      }>;
+    },
+  });
+
+  const ingredients = useQuery({
+    queryKey: ["ingredients"],
+    queryFn: async () => {
+      const res = await fetch("/api/ingredients");
+      return res.json() as Promise<{ ingredients: Ingredient[] }>;
+    },
+  });
+
+  const menu = useQuery({
+    queryKey: ["menu"],
+    queryFn: async () => {
+      const res = await fetch("/api/menu");
+      return res.json() as Promise<{ menuItems: unknown[] }>;
+    },
+  });
+
+  const stock = ingredients.data?.ingredients ?? [];
+  const low = stock.filter(
+    (i) => num(i.parLevel) > 0 && num(i.currentStock) < num(i.parLevel),
+  );
+  const inventoryValue = stock.reduce(
+    (sum, i) => sum + num(i.currentStock) * num(i.costPerUnit),
+    0,
+  );
+  const currency = me.data?.restaurant?.currency ?? "USD";
+
+  return (
+    <div className="animate-rise space-y-4">
+      <div>
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
+          Yield pulse
+        </h1>
+        <p className="text-sm text-[var(--muted)]">
+          {me.data?.restaurant?.cuisineType} · {me.data?.restaurant?.city}
+          {me.data?.restaurant?.region ? `, ${me.data.restaurant.region}` : ""}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <Card>
+          <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
+            On-hand value
+          </p>
+          <p className="mt-2 font-[family-name:var(--font-display)] text-2xl">
+            {money(inventoryValue, currency)}
+          </p>
+        </Card>
+        <Card>
+          <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
+            Menu items
+          </p>
+          <p className="mt-2 font-[family-name:var(--font-display)] text-2xl">
+            {menu.data?.menuItems?.length ?? "—"}
+          </p>
+        </Card>
+      </div>
+
+      <Card className="space-y-3">
+        <div className="flex items-center justify-between">
+          <CardTitle>Below par</CardTitle>
+          <Badge>{low.length}</Badge>
+        </div>
+        {low.length === 0 ? (
+          <p className="text-sm text-[var(--muted)]">All tracked items at par.</p>
+        ) : (
+          <ul className="space-y-2">
+            {low.slice(0, 5).map((i) => (
+              <li key={i.id} className="flex justify-between text-sm">
+                <span>{i.name}</span>
+                <span className="text-[var(--warn)]">
+                  {num(i.currentStock)} {i.unit}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+
+      <div className="grid gap-2">
+        <Link
+          href="/shifts"
+          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-medium"
+        >
+          Run blind closing count →
+        </Link>
+        <Link
+          href="/menu"
+          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-medium"
+        >
+          Autofill menu & recipes with Gemini →
+        </Link>
+        <Link
+          href="/insights"
+          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-medium"
+        >
+          Area cuisine grocery vs sales averages →
+        </Link>
+      </div>
+    </div>
+  );
+}

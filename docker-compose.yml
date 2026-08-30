@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: kitchenyield
+    ports:
+      - "5432:5432"
+    volumes:
+      - ky_pg:/var/lib/postgresql/data
+
+volumes:
+  ky_pg:
