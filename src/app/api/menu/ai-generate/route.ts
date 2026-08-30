@@ -132,8 +132,11 @@ export async function POST(request: Request) {
       return jsonError(err.issues[0]?.message ?? "Invalid input");
     }
     console.error(err);
-    const message =
+    const raw =
       err instanceof Error ? err.message : "Menu generation failed";
+    const message = /JSON|Unexpected|Expected|incomplete JSON/i.test(raw)
+      ? "Menu generation returned incomplete data. Please try again."
+      : raw;
     return jsonError(message, 500);
   }
 }

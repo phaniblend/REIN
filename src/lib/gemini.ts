@@ -100,8 +100,8 @@ async function generateContentOnce(
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
-        temperature: 0.5,
-        maxOutputTokens: 8192,
+        temperature: 0.4,
+        maxOutputTokens: 16384,
         responseMimeType: "application/json",
       },
     }),
@@ -110,7 +110,10 @@ async function generateContentOnce(
   const bodyText = await res.text();
   let body: {
     error?: { code?: number; message?: string; status?: string };
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: {
+      finishReason?: string;
+      content?: { parts?: { text?: string }[] };
+    }[];
   };
   try {
     body = JSON.parse(bodyText) as typeof body;
@@ -140,13 +143,91 @@ async function generateContentOnce(
     throw new Error("Menu generation failed. Try again shortly.");
   }
 
+  const candidate = body.candidates?.[0];
   const text =
-    body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ??
-    "";
+    candidate?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
   if (!text.trim()) {
     throw new Error("Menu generation returned empty content");
   }
-  return text;
+  return { text, finishReason: candidate?.finishReason ?? "" };
+}
+
+/** Pull complete objects out of a truncated `"items": [ ...` array. */
+function extractCompleteItems(text: string): unknown[] {
+  const marker = text.match(/"items"\s*:\s*\[/);
+  if (!marker || marker.index === undefined) return [];
+
+  const items: unknown[] = [];
+  let i = marker.index + marker[0].length;
+
+  while (i < text.length) {
+    while (i < text.length && /[\s,]/.test(text[i]!)) i += 1;
+    if (i >= text.length || text[i] === "]") break;
+    if (text[i] !== "{") break;
+
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let end = -1;
+    for (let j = i; j < text.length; j += 1) {
+      const ch = text[j]!;
+      if (inString) {
+        if (escape) escape = false;
+        else if (ch === "\\") escape = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+      if (ch === "{") depth += 1;
+      else if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          end = j;
+          break;
+        }
+      }
+    }
+    if (end === -1) break;
+    try {
+      items.push(JSON.parse(text.slice(i, end + 1)));
+    } catch {
+      break;
+    }
+    i = end + 1;
+  }
+
+  return items;
+}
+
+function parseJsonLoose(text: string): unknown {
+  const cleaned = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // ignore and try salvage
+  }
+
+  const items = extractCompleteItems(cleaned);
+  if (items.length > 0) return { items };
+
+  const match = cleaned.match(/\{[\s\S]*\}/);
+  if (match) {
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      const salvaged = extractCompleteItems(match[0]);
+      if (salvaged.length > 0) return { items: salvaged };
+    }
+  }
+
+  throw new Error("Menu generation returned incomplete JSON. Try again.");
 }
 
 async function generateJson<T>(prompt: string, schema: z.ZodType<T>): Promise<T> {
@@ -155,23 +236,24 @@ async function generateJson<T>(prompt: string, schema: z.ZodType<T>): Promise<T>
   let lastError: unknown;
 
   for (const model of models) {
-    try {
-      const text = await generateContentOnce(model, prompt, apiKey);
-      let parsed: unknown;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
-        parsed = JSON.parse(text);
-      } catch {
-        const match = text.match(/\{[\s\S]*\}/);
-        if (!match) throw new Error("Menu generation returned invalid content");
-        parsed = JSON.parse(match[0]);
+        const { text } = await generateContentOnce(model, prompt, apiKey);
+        const parsed = parseJsonLoose(text);
+        return schema.parse(parsed);
+      } catch (err) {
+        lastError = err;
+        if (
+          err instanceof Error &&
+          err.message.startsWith("MODEL_UNAVAILABLE:")
+        ) {
+          break;
+        }
+        // Retry once on parse/validation issues with same model.
+        if (attempt === 0) continue;
+        // Next model only for unavailable; otherwise fail after retry.
+        throw err;
       }
-      return schema.parse(parsed);
-    } catch (err) {
-      lastError = err;
-      if (err instanceof Error && err.message.startsWith("MODEL_UNAVAILABLE:")) {
-        continue;
-      }
-      throw err;
     }
   }
 
@@ -181,6 +263,29 @@ async function generateJson<T>(prompt: string, schema: z.ZodType<T>): Promise<T>
 }
 
 type MenuBatch = { label: string; count: number; detail: string };
+
+/** Keep each Gemini call small so JSON doesn't truncate mid-array. */
+function splitBatches(batches: MenuBatch[], maxPerCall = 4): MenuBatch[] {
+  const out: MenuBatch[] = [];
+  for (const batch of batches) {
+    let remaining = batch.count;
+    let part = 1;
+    while (remaining > 0) {
+      const n = Math.min(maxPerCall, remaining);
+      out.push({
+        label:
+          batch.count > maxPerCall
+            ? `${batch.label} (part ${part})`
+            : batch.label,
+        count: n,
+        detail: batch.detail,
+      });
+      remaining -= n;
+      part += 1;
+    }
+  }
+  return out;
+}
 
 function indianMenuBatches(): MenuBatch[] {
   return [
@@ -268,51 +373,50 @@ export async function suggestMenuAndRecipes(input: {
     .filter(Boolean)
     .join(", ");
   const cuisine = input.cuisineType || "Indian";
+  const focus = input.focus ?? "";
   const isIndian = /indian|north indian|south indian|punjabi|mughlai|indo/i.test(
-    cuisine,
+    `${cuisine} ${focus}`,
   );
 
-  const batches = isIndian ? indianMenuBatches() : genericMenuBatches(requested);
+  const batches = splitBatches(
+    isIndian ? indianMenuBatches() : genericMenuBatches(requested),
+    4,
+  );
 
   const baseContext = `Restaurant: ${input.restaurantName}
 Cuisine: ${cuisine}
 Location: ${location || "unspecified"}
 Currency: ${input.currency ?? "USD"}
-Existing ingredients to prefer when relevant: ${(input.existingIngredients ?? []).join(", ") || "none"}
-Owner focus note: ${input.focus ?? "full dine-in lunch and dinner menu"}`;
+Existing ingredients to prefer when relevant: ${(input.existingIngredients ?? []).slice(0, 40).join(", ") || "none"}
+Owner focus note: ${focus || "full dine-in lunch and dinner menu"}`;
 
   const allItems: MenuRecipeSuggestion["items"] = [];
 
   for (const batch of batches) {
     const prompt = `You are a restaurant culinary ops assistant for Restman.
-Return ONLY valid JSON matching this TypeScript shape:
-{
-  "items": [{
-    "name": string,
-    "category": string,
-    "sellingPrice": number,
-    "ingredients": [{
-      "name": string,
-      "category": string,
-      "unit": "KG" | "G" | "L" | "ML" | "PIECE" | "PACKET",
-      "grossQuantity": number,
-      "shrinkageMarginPercent": number,
-      "estimatedCostPerUnit": number
-    }]
-  }]
-}
+Return ONLY valid compact JSON (no markdown, no comments) matching:
+{"items":[{"name":string,"category":string,"sellingPrice":number,"ingredients":[{"name":string,"category":string,"unit":"KG"|"G"|"L"|"ML"|"PIECE"|"PACKET","grossQuantity":number,"shrinkageMarginPercent":number,"estimatedCostPerUnit":number}]}]}
 
 ${baseContext}
 
-Generate a FULL menu section for: ${batch.label}
+Section: ${batch.label}
 ${batch.detail}
-Generate exactly ${batch.count} distinct dishes (no duplicates, no placeholders).
-Each dish needs a realistic per-portion BOM for kitchen yield tracking.
-Use practical units (G/ML for portion-level).
-Prices and costs should be realistic for the location and cuisine.`;
+Generate exactly ${batch.count} distinct dishes.
+Keep each BOM lean: 4 to 6 key ingredients only (skip every spice/oil if redundant).
+Use portion units (G/ML). Realistic local prices.`;
 
-    const partial = await generateJson(prompt, menuRecipeSuggestionSchema);
-    allItems.push(...partial.items.slice(0, batch.count));
+    try {
+      const partial = await generateJson(prompt, menuRecipeSuggestionSchema);
+      allItems.push(...partial.items.slice(0, batch.count));
+    } catch (err) {
+      // Soft-fail a single small batch so one truncated call doesn't wipe the run.
+      console.error("[menu-gen] batch failed", batch.label, err);
+      if (allItems.length === 0) throw err;
+    }
+  }
+
+  if (allItems.length === 0) {
+    throw new Error("Menu generation returned no dishes. Try again.");
   }
 
   const seen = new Set<string>();
