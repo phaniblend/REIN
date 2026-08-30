@@ -22,7 +22,7 @@ export default async function AppLayout({
   return (
     <AppShell
       userName={session.name}
-      restaurantName={restaurant?.name ?? "Kitchen"}
+      restaurantName={restaurant?.name ?? "Restaurant"}
     >
       {children}
     </AppShell>
