@@ -8,7 +8,8 @@ export function middleware(request: NextRequest) {
   const isPublic =
     publicPaths.includes(pathname) ||
     pathname.startsWith("/api/auth/login") ||
-    pathname.startsWith("/api/auth/register");
+    pathname.startsWith("/api/auth/register") ||
+    pathname.startsWith("/api/auth/otp");
 
   const session = request.cookies.get("ky_session");
 

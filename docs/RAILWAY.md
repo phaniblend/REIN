@@ -8,6 +8,12 @@
 | `AUTH_SECRET` | Long random string (generate locally: `openssl rand -hex 32`) |
 | `GEMINI_API_KEY` | Your Google AI Studio key |
 | `GEMINI_MODEL` | `gemini-2.5-flash` (optional) |
+| `TWILIO_ACCOUNT_SID` | Twilio Account SID (for owner SMS login) |
+| `TWILIO_AUTH_TOKEN` | Twilio Auth Token |
+| `TWILIO_FROM_NUMBER` | Twilio number in E.164 (`+15551234567`) |
+| `SMS_PROVIDER` | Optional: `twilio` or `console` (logs codes; default auto) |
+
+Without Twilio vars, OTP codes are logged to Railway logs and returned as `devCode` in the API so you can still test.
 
 ## Remove if present (causes npm E401)
 

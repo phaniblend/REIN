@@ -31,6 +31,11 @@ export async function verifyPassword(password: string, hash: string) {
   return bcrypt.compare(password, hash);
 }
 
+export async function getUserByPhone(phone: string) {
+  const [user] = await db.select().from(users).where(eq(users.phone, phone)).limit(1);
+  return user ?? null;
+}
+
 export async function createSessionToken(user: SessionUser) {
   return new SignJWT({
     sub: user.id,

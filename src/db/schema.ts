@@ -74,12 +74,32 @@ export const users = pgTable(
       .references(() => restaurants.id, { onDelete: "cascade" })
       .notNull(),
     name: text("name").notNull(),
-    email: text("email").unique().notNull(),
-    passwordHash: text("password_hash").notNull(),
+    email: text("email").unique(),
+    phone: text("phone").unique(),
+    passwordHash: text("password_hash"),
     role: roleEnum("role").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [index("users_restaurant_idx").on(t.restaurantId)],
+  (t) => [
+    index("users_restaurant_idx").on(t.restaurantId),
+    index("users_phone_idx").on(t.phone),
+  ],
+);
+
+/** Short-lived SMS OTP challenges for owner mobile auth */
+export const otpChallenges = pgTable(
+  "otp_challenges",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    phone: text("phone").notNull(),
+    codeHash: text("code_hash").notNull(),
+    purpose: text("purpose").notNull(), // login | register
+    payload: text("payload"), // JSON for pending registration
+    attempts: numeric("attempts", { precision: 2, scale: 0 }).default("0").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("otp_phone_idx").on(t.phone)],
 );
 
 export const ingredients = pgTable(

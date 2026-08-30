@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
     const token = await createSessionToken({
       id: owner.id,
-      email: owner.email,
+      email: owner.email ?? "",
       name: owner.name,
       role: owner.role,
       restaurantId: owner.restaurantId,

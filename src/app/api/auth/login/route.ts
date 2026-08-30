@@ -23,13 +23,13 @@ export async function POST(request: Request) {
       .where(eq(users.email, body.email.toLowerCase()))
       .limit(1);
 
-    if (!user) return jsonError("Invalid credentials", 401);
+    if (!user?.passwordHash) return jsonError("Invalid credentials", 401);
     const ok = await verifyPassword(body.password, user.passwordHash);
     if (!ok) return jsonError("Invalid credentials", 401);
 
     const token = await createSessionToken({
       id: user.id,
-      email: user.email,
+      email: user.email ?? "",
       name: user.name,
       role: user.role,
       restaurantId: user.restaurantId,
