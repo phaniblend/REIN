@@ -1,23 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #e8eef3;
-  --fg: #14212b;
-  --muted: #5b6b78;
-  --surface: #f7fafc;
-  --surface-2: #d9e3eb;
-  --surface-3: #c5d3de;
-  --border: #b8c7d3;
-  --accent: #0f766e;
-  --accent-fg: #f3fffc;
-  --accent-soft: #cfeae6;
+  /* Restman brand — forest green + cream */
+  --bg: #f9f7f2;
+  --fg: #1a241c;
+  --muted: #6b7368;
+  --surface: #fffcf7;
+  --surface-2: #efe8de;
+  --surface-3: #e2d9cc;
+  --border: #d9d0c3;
+  --accent: #264735;
+  --accent-fg: #f4faf5;
+  --accent-soft: #d8e6d1;
+  --accent-mid: #3d6b4f;
+  --tan: #efe8de;
   --danger: #b42318;
-  --ring: #0d9488;
+  --ring: #264735;
   --ok: #3f6212;
-  --warn: #a16207;
-  --hero-glow: radial-gradient(110% 70% at 0% 0%, #c9e8e3 0%, transparent 50%),
-    radial-gradient(90% 60% at 100% 0%, #c5d8ef 0%, transparent 48%),
-    linear-gradient(160deg, #edf3f7 0%, #e3ebf2 55%, #d9e4ec 100%);
+  --warn: #8a6a2f;
+  --chart-bar: #d8e6d1;
+  --chart-cap: #264735;
+  --hero-glow: radial-gradient(120% 80% at 0% 0%, #d8e6d1 0%, transparent 52%),
+    radial-gradient(90% 60% at 100% 0%, #efe8de 0%, transparent 48%),
+    linear-gradient(165deg, #f9f7f2 0%, #f3efe6 55%, #ebe4d8 100%);
 }
 
 @theme inline {
@@ -44,7 +49,7 @@ body {
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--accent) 30%, white);
+  background: color-mix(in oklab, var(--accent) 28%, white);
 }
 
 @keyframes rise-in {
@@ -74,4 +79,22 @@ body {
 
 .animate-pulse-soft {
   animation: pulse-soft 2.4s ease-in-out infinite;
+}
+
+/* Chart bars: mint fill + forest cap */
+.rm-bar {
+  position: relative;
+  border-radius: 999px 999px 6px 6px;
+  background: var(--chart-bar);
+}
+
+.rm-bar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--chart-cap);
 }

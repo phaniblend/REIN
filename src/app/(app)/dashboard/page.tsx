@@ -3,8 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { money, num } from "@/lib/utils";
+import { DataAlert, MiniBarChart, StatTile } from "@/components/ui/data-viz";
 
 type Ingredient = {
   id: string;
@@ -57,12 +57,19 @@ export default function DashboardPage() {
     0,
   );
   const currency = me.data?.restaurant?.currency ?? "USD";
+  const menuCount = menu.data?.menuItems?.length ?? 0;
+
+  const chartBars = [
+    { label: "Stock", value: Math.max(stock.length, 1) },
+    { label: "Menu", value: Math.max(menuCount, 1) },
+    { label: "Low", value: Math.max(low.length, 0.4) },
+  ];
 
   return (
     <div className="animate-rise space-y-4">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
-          Ops pulse
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
+          Know what your kitchen uses.
         </h1>
         <p className="text-sm text-[var(--muted)]">
           {me.data?.restaurant?.cuisineType} · {me.data?.restaurant?.city}
@@ -71,63 +78,66 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Card>
-          <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
-            On-hand value
-          </p>
-          <p className="mt-2 font-[family-name:var(--font-display)] text-2xl">
-            {money(inventoryValue, currency)}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-xs uppercase tracking-wide text-[var(--muted)]">
-            Menu items
-          </p>
-          <p className="mt-2 font-[family-name:var(--font-display)] text-2xl">
-            {menu.data?.menuItems?.length ?? "—"}
-          </p>
-        </Card>
+        <StatTile
+          label="On-hand value"
+          value={money(inventoryValue, currency)}
+          tone="cream"
+        />
+        <StatTile
+          label="Menu items"
+          value={String(menuCount || "—")}
+          tone="forest"
+        />
       </div>
 
-      <Card className="space-y-3">
-        <div className="flex items-center justify-between">
-          <CardTitle>Below par</CardTitle>
-          <Badge>{low.length}</Badge>
-        </div>
-        {low.length === 0 ? (
-          <p className="text-sm text-[var(--muted)]">All tracked items at par.</p>
-        ) : (
+      <Card>
+        <MiniBarChart title="Usage by station" bars={chartBars} />
+      </Card>
+
+      <DataAlert
+        title="Below par"
+        message={
+          low.length === 0
+            ? "All tracked items at par."
+            : `${low.length} ingredient${low.length === 1 ? "" : "s"} need a plan before next service.`
+        }
+        count={low.length}
+      />
+
+      {low.length > 0 && (
+        <Card className="space-y-2">
+          <CardTitle>Priority pulls</CardTitle>
           <ul className="space-y-2">
             {low.slice(0, 5).map((i) => (
               <li key={i.id} className="flex justify-between text-sm">
                 <span>{i.name}</span>
-                <span className="text-[var(--warn)]">
+                <span className="font-medium text-[var(--warn)]">
                   {num(i.currentStock)} {i.unit}
                 </span>
               </li>
             ))}
           </ul>
-        )}
-      </Card>
+        </Card>
+      )}
 
       <div className="grid gap-2">
         <Link
           href="/shifts"
-          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-medium"
+          className="rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--accent-fg)]"
         >
           Run blind closing count →
         </Link>
         <Link
           href="/menu"
-          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-medium"
+          className="rounded-2xl border border-[var(--fg)] bg-[var(--surface)] px-4 py-3 text-sm font-medium"
         >
-          Autofill menu & recipes with Gemini →
+          Autofill menu with Gemini →
         </Link>
         <Link
           href="/insights"
-          className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-medium"
+          className="rounded-2xl bg-[var(--tan)] px-4 py-3 text-sm font-medium"
         >
-          Area cuisine grocery vs sales averages →
+          Area cuisine grocery vs sales →
         </Link>
       </div>
     </div>

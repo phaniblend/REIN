@@ -7,6 +7,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { DataAlert } from "@/components/ui/data-viz";
 
 type Ingredient = { id: string; name: string; unit: string };
 type WasteRow = {
@@ -69,7 +70,7 @@ export default function WastagePage() {
   return (
     <div className="animate-rise space-y-4">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
           Wastage log
         </h1>
         <p className="text-sm text-[var(--muted)]">
@@ -77,6 +78,16 @@ export default function WastagePage() {
           loss.
         </p>
       </div>
+
+      <DataAlert
+        title="Waste entries"
+        message={
+          (logs.data?.wastage?.length ?? 0) === 0
+            ? "No waste logged yet this period."
+            : `${logs.data?.wastage.length} logged entries — keep spoilage out of AvT.`
+        }
+        count={logs.data?.wastage?.length ?? 0}
+      />
 
       <Card className="space-y-3">
         <CardTitle>Log waste</CardTitle>

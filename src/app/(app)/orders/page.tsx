@@ -83,7 +83,7 @@ export default function OrdersPage() {
 
   return (
     <div className="animate-rise space-y-4">
-      <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
+      <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
         POS tickets
       </h1>
 

@@ -4,8 +4,8 @@
   "description": "Restaurant manager for inventory, AvT yield, and Gemini menu insights",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#e8eef3",
-  "theme_color": "#0f766e",
+  "background_color": "#f9f7f2",
+  "theme_color": "#264735",
   "icons": [
     {
       "src": "/icons/icon.svg",

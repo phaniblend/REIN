@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  ChefHat,
   ClipboardList,
   LayoutDashboard,
   LogOut,
@@ -15,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { RestmanLogo } from "@/components/restman-logo";
 
 const links = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
@@ -49,9 +49,7 @@ export function AppShell({
       <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] px-4 py-3 backdrop-blur-md">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-[family-name:var(--font-display)] text-xl leading-none tracking-tight">
-              Restman
-            </p>
+            <RestmanLogo size={26} />
             <p className="mt-1 truncate text-xs text-[var(--muted)]">
               {restaurantName} · {userName}
             </p>
@@ -73,7 +71,7 @@ export function AppShell({
                 key={href}
                 href={href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-md px-1 py-1.5 text-[10px]",
+                  "flex flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px]",
                   active
                     ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                     : "text-[var(--muted)]",
@@ -86,10 +84,6 @@ export function AppShell({
           })}
         </div>
       </nav>
-
-      <div className="pointer-events-none fixed bottom-20 right-4 opacity-20">
-        <ChefHat className="h-16 w-16" />
-      </div>
     </div>
   );
 }

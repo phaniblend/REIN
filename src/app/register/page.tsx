@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { RestmanLogo } from "@/components/restman-logo";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -49,12 +50,12 @@ export default function RegisterPage() {
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-lg flex-col px-4 py-8">
-      <p className="mb-4 font-[family-name:var(--font-display)] text-3xl font-semibold">
-        Restman
-      </p>
+      <div className="mb-4">
+        <RestmanLogo size={32} />
+      </div>
       <Card className="animate-rise space-y-4">
         <div>
-          <h1 className="text-xl font-medium">Open with Restman</h1>
+          <h1 className="text-xl font-medium text-[var(--accent)]">Open with Restman</h1>
           <p className="text-sm text-[var(--muted)]">
             Owner account + restaurant profile for local cuisine benchmarks.
           </p>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { RestmanLogo } from "@/components/restman-logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,11 +37,11 @@ export default function LoginPage() {
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-lg flex-col justify-center px-4 py-10">
-      <p className="mb-6 font-[family-name:var(--font-display)] text-3xl font-semibold">
-        Restman
-      </p>
+      <div className="mb-6">
+        <RestmanLogo size={32} />
+      </div>
       <Card className="animate-rise space-y-4">
-        <h1 className="text-xl font-medium">Sign in</h1>
+        <h1 className="text-xl font-medium text-[var(--accent)]">Sign in</h1>
         <form onSubmit={onSubmit} className="space-y-3">
           <div>
             <Label htmlFor="email">Email</Label>

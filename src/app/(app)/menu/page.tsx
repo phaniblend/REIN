@@ -60,7 +60,7 @@ export default function MenuPage() {
   return (
     <div className="animate-rise space-y-4">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
           Menu & recipes
         </h1>
         <p className="text-sm text-[var(--muted)]">

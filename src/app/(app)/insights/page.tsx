@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatTile } from "@/components/ui/data-viz";
 
 type LocationStats = {
   cuisineType: string;
@@ -48,7 +49,7 @@ export default function InsightsPage() {
   return (
     <div className="animate-rise space-y-4">
       <div>
-        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold">
+        <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
           Area cuisine averages
         </h1>
         <p className="text-sm text-[var(--muted)]">
@@ -85,34 +86,26 @@ export default function InsightsPage() {
           </Card>
 
           <div className="grid grid-cols-2 gap-3">
-            <Card>
-              <p className="text-xs uppercase text-[var(--muted)]">
-                Bought / sold ratio
-              </p>
-              <p className="mt-2 font-[family-name:var(--font-display)] text-2xl">
-                {a.groceryBoughtVsSoldRatio.toFixed(2)}×
-              </p>
-            </Card>
-            <Card>
-              <p className="text-xs uppercase text-[var(--muted)]">Food cost %</p>
-              <p className="mt-2 font-[family-name:var(--font-display)] text-2xl">
-                {a.foodCostPercentOfSales.toFixed(1)}%
-              </p>
-            </Card>
-            <Card>
-              <p className="text-xs uppercase text-[var(--muted)]">Spoilage %</p>
-              <p className="mt-2 font-[family-name:var(--font-display)] text-2xl">
-                {a.spoilageWastePercentOfPurchases.toFixed(1)}%
-              </p>
-            </Card>
-            <Card>
-              <p className="text-xs uppercase text-[var(--muted)]">
-                Unaccounted shrink
-              </p>
-              <p className="mt-2 font-[family-name:var(--font-display)] text-2xl">
-                {a.unaccountedShrinkPercentOfUsage.toFixed(1)}%
-              </p>
-            </Card>
+            <StatTile
+              label="Bought / sold ratio"
+              value={`${a.groceryBoughtVsSoldRatio.toFixed(2)}×`}
+              tone="cream"
+            />
+            <StatTile
+              label="Food cost %"
+              value={`${a.foodCostPercentOfSales.toFixed(1)}%`}
+              tone="forest"
+            />
+            <StatTile
+              label="Spoilage %"
+              value={`${a.spoilageWastePercentOfPurchases.toFixed(1)}%`}
+              tone="cream"
+            />
+            <StatTile
+              label="Unaccounted shrink"
+              value={`${a.unaccountedShrinkPercentOfUsage.toFixed(1)}%`}
+              tone="forest"
+            />
           </div>
 
           <Card className="space-y-2">
