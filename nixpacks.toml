@@ -2,7 +2,7 @@
 nixPkgs = ["nodejs_20", "openssl"]
 
 [phases.install]
-cmds = ["npm install --no-audit --no-fund"]
+cmds = ["npm ci"]
 
 [phases.build]
 cmds = ["npm run build"]
@@ -11,6 +11,4 @@ cmds = ["npm run build"]
 cmd = "npm run start:railway"
 
 [variables]
-NIXPACKS_NODE_VERSION = "20"
-NPM_CONFIG_PRODUCTION = "false"
 NODE_ENV = "production"
