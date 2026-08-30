@@ -4,6 +4,10 @@ import { cookies } from "next/headers";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
+import {
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_SEC,
+} from "@/lib/session-cookie";
 
 export type UserRole = "OWNER" | "CHEF" | "WAITER" | "STOCK_CLERK";
 
@@ -15,12 +19,21 @@ export type SessionUser = {
   restaurantId: string;
 };
 
-const COOKIE = "ky_session";
-
 function secretKey() {
   const secret = process.env.AUTH_SECRET;
   if (!secret) throw new Error("AUTH_SECRET is not set");
   return new TextEncoder().encode(secret);
+}
+
+function cookieSecure() {
+  if (process.env.COOKIE_SECURE === "true") return true;
+  if (process.env.COOKIE_SECURE === "false") return false;
+  return process.env.NODE_ENV === "production";
+}
+
+function cookieDomain(): string | undefined {
+  const raw = process.env.COOKIE_DOMAIN?.trim();
+  return raw || undefined;
 }
 
 export async function hashPassword(password: string) {
@@ -46,29 +59,39 @@ export async function createSessionToken(user: SessionUser) {
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("14d")
+    .setExpirationTime(`${SESSION_MAX_AGE_SEC}s`)
     .sign(secretKey());
 }
 
 export async function setSessionCookie(token: string) {
   const jar = await cookies();
-  jar.set(COOKIE, token, {
+  const domain = cookieDomain();
+  jar.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: cookieSecure(),
     path: "/",
-    maxAge: 60 * 60 * 24 * 14,
+    maxAge: SESSION_MAX_AGE_SEC,
+    ...(domain ? { domain } : {}),
   });
 }
 
 export async function clearSessionCookie() {
   const jar = await cookies();
-  jar.delete(COOKIE);
+  const domain = cookieDomain();
+  jar.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: cookieSecure(),
+    path: "/",
+    maxAge: 0,
+    ...(domain ? { domain } : {}),
+  });
 }
 
 export async function getSession(): Promise<SessionUser | null> {
   const jar = await cookies();
-  const token = jar.get(COOKIE)?.value;
+  const token = jar.get(SESSION_COOKIE)?.value;
   if (!token) return null;
 
   try {
@@ -106,4 +129,11 @@ export async function requireSession(roles?: UserRole[]) {
 export async function getUserByEmail(email: string) {
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   return user ?? null;
+}
+
+export function homePathForRole(role: string) {
+  if (role === "CHEF") return "/recipes";
+  if (role === "WAITER") return "/orders";
+  if (role === "STOCK_CLERK") return "/inventory";
+  return "/dashboard";
 }

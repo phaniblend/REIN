@@ -86,6 +86,20 @@ export default function TeamPage() {
     onError: (err: Error) => setError(err.message),
   });
 
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/staff/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not remove");
+      return data;
+    },
+    onSuccess: () => {
+      setError(null);
+      qc.invalidateQueries({ queryKey: ["staff"] });
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
   const bulkInvite = useMutation({
     mutationFn: async (contacts: StagedContact[]) => {
       const results: { phone: string; ok: boolean; error?: string; link?: string }[] =
@@ -365,11 +379,33 @@ export default function TeamPage() {
               key={m.id}
               className="flex items-center justify-between gap-2 text-sm"
             >
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium">{m.name}</p>
                 <p className="text-xs text-[var(--muted)]">{m.phone ?? "—"}</p>
               </div>
-              <Badge>{m.role}</Badge>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge>{m.role}</Badge>
+                {m.role !== "OWNER" && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    type="button"
+                    disabled={remove.isPending}
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          `Remove ${m.name} from the team? Their invite link will stop working.`,
+                        )
+                      ) {
+                        return;
+                      }
+                      remove.mutate(m.id);
+                    }}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
             </li>
           ))}
         </ul>

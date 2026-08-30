@@ -9,10 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 type InviteInfo = {
+  status: "pending" | "accepted";
   phone: string;
   name: string | null;
   role: string;
   restaurantName: string;
+  canContinue?: boolean;
 };
 
 export default function InviteAcceptPage() {
@@ -22,7 +24,7 @@ export default function InviteAcceptPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [accepting, setAccepting] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,25 +45,25 @@ export default function InviteAcceptPage() {
     };
   }, [token]);
 
-  async function accept(e: React.FormEvent) {
-    e.preventDefault();
-    setAccepting(true);
+  async function joinOrContinue(action: "accept" | "continue") {
+    setBusy(true);
     setError(null);
     const res = await fetch(`/api/invite/${token}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify(
+        action === "continue"
+          ? { action: "continue" }
+          : { action: "accept", name },
+      ),
     });
     const data = await res.json();
-    setAccepting(false);
+    setBusy(false);
     if (!res.ok) {
-      setError(data.error ?? "Could not join");
+      setError(data.error ?? "Could not continue");
       return;
     }
-    const role = data.user?.role as string | undefined;
-    if (role === "CHEF") router.push("/recipes");
-    else if (role === "WAITER") router.push("/orders");
-    else router.push("/dashboard");
+    router.push(data.redirectTo ?? "/dashboard");
     router.refresh();
   }
 
@@ -72,16 +74,28 @@ export default function InviteAcceptPage() {
       </div>
       <Card className="animate-rise space-y-4">
         <div>
-          <h1 className="text-xl font-medium text-[var(--accent)]">Join team</h1>
+          <h1 className="text-xl font-medium text-[var(--accent)]">
+            {info?.status === "accepted" ? "Welcome back" : "Join team"}
+          </h1>
           <p className="text-sm text-[var(--muted)]">
-            Secure invite from your restaurant owner — no separate signup.
+            {info?.status === "accepted"
+              ? "Your invite link signs you back in — no extra login."
+              : "Secure invite from your restaurant owner — no separate signup."}
           </p>
         </div>
 
-        {loading && <p className="text-sm text-[var(--muted)]">Loading invite…</p>}
+        {loading && (
+          <p className="text-sm text-[var(--muted)]">Loading invite…</p>
+        )}
 
-        {!loading && info && (
-          <form onSubmit={accept} className="space-y-3">
+        {!loading && info?.status === "pending" && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void joinOrContinue("accept");
+            }}
+            className="space-y-3"
+          >
             <div className="rounded-2xl bg-[var(--tan)] px-3 py-3 text-sm">
               <p className="font-medium">{info.restaurantName}</p>
               <p className="text-[var(--muted)]">
@@ -99,10 +113,29 @@ export default function InviteAcceptPage() {
               />
             </div>
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
-            <Button type="submit" className="w-full" disabled={accepting}>
-              {accepting ? "Joining…" : "Accept & continue"}
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? "Joining…" : "Accept & continue"}
             </Button>
           </form>
+        )}
+
+        {!loading && info?.status === "accepted" && (
+          <div className="space-y-3">
+            <div className="rounded-2xl bg-[var(--tan)] px-3 py-3 text-sm">
+              <p className="font-medium">{info.restaurantName}</p>
+              <p className="text-[var(--muted)]">
+                Role: {info.role} · {info.phone}
+              </p>
+            </div>
+            {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
+            <Button
+              className="w-full"
+              disabled={busy}
+              onClick={() => void joinOrContinue("continue")}
+            >
+              {busy ? "Signing in…" : "Continue to Restman"}
+            </Button>
+          </div>
         )}
 
         {!loading && !info && error && (
