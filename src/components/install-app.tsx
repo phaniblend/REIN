@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import { Download, PlusSquare, Share } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type BeforeInstallPromptEvent = Event & {
@@ -9,40 +9,43 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-function isIos() {
+function detectIos() {
   if (typeof navigator === "undefined") return false;
-  return /iphone|ipad|ipod/i.test(navigator.userAgent);
-}
-
-function isStandalone() {
-  if (typeof window === "undefined") return false;
+  const ua = navigator.userAgent;
+  if (/iphone|ipad|ipod/i.test(ua)) return true;
+  // iPadOS 13+ can report as Mac
   return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    // iOS Safari
-    ("standalone" in navigator &&
-      Boolean((navigator as Navigator & { standalone?: boolean }).standalone))
+    navigator.platform === "MacIntel" &&
+    typeof navigator.maxTouchPoints === "number" &&
+    navigator.maxTouchPoints > 1
   );
 }
 
-export function InstallAppButton({
-  className,
-  variant = "primary",
-}: {
-  className?: string;
-  variant?: "primary" | "secondary";
-}) {
+function detectStandalone() {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
+  );
+}
+
+export function InstallAppButton({ className }: { className?: string }) {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(
     null,
   );
   const [installed, setInstalled] = useState(false);
-  const [iosHint, setIosHint] = useState(false);
+  const [isIos, setIsIos] = useState(false);
+  const [showHowTo, setShowHowTo] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (isStandalone()) {
+    setReady(true);
+    if (detectStandalone()) {
       setInstalled(true);
       return;
     }
+    setIsIos(detectIos());
 
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -51,6 +54,7 @@ export function InstallAppButton({
     const onInstalled = () => {
       setInstalled(true);
       setDeferred(null);
+      setShowHowTo(false);
     };
 
     window.addEventListener("beforeinstallprompt", onPrompt);
@@ -61,55 +65,107 @@ export function InstallAppButton({
     };
   }, []);
 
+  if (!ready) {
+    return (
+      <div
+        className={cn(
+          "h-12 w-full animate-pulse rounded-full bg-[var(--accent-soft)]",
+          className,
+        )}
+      />
+    );
+  }
+
   if (installed) {
     return (
-      <p className="text-center text-sm text-[var(--muted)]">
-        Restman is installed on this device.
+      <p className="rounded-2xl bg-[var(--tan)] px-4 py-3 text-center text-sm text-[var(--accent)]">
+        Restman is on your Home Screen — open it from there next time.
       </p>
     );
   }
 
-  async function install() {
+  async function onInstallClick() {
+    // Android / desktop Chromium
     if (deferred) {
       setBusy(true);
-      await deferred.prompt();
-      await deferred.userChoice;
-      setDeferred(null);
-      setBusy(false);
+      try {
+        await deferred.prompt();
+        await deferred.userChoice;
+      } finally {
+        setDeferred(null);
+        setBusy(false);
+      }
       return;
     }
-    if (isIos()) {
-      setIosHint(true);
-      return;
-    }
-    // Browser supports PWA but prompt not ready yet — nudge user
-    setIosHint(true);
+
+    // iPhone / iPad — Apple does not allow a native install API
+    setShowHowTo(true);
   }
 
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("space-y-3", className)}>
       <button
         type="button"
-        onClick={install}
+        onClick={onInstallClick}
         disabled={busy}
-        className={cn(
-          "inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-base font-medium",
-          variant === "primary"
-            ? "bg-[var(--accent)] text-[var(--accent-fg)]"
-            : "border border-[var(--accent)] bg-[var(--surface)] text-[var(--accent)]",
-        )}
+        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-6 text-base font-medium text-[var(--accent-fg)] active:opacity-90"
       >
-        <Download className="h-4 w-4" />
-        {busy ? "Installing…" : "Install app"}
-      </button>
-      {iosHint && (
-        <p className="text-center text-xs text-[var(--muted)]">
-          {isIos()
-            ? "On iPhone: tap Share, then “Add to Home Screen”."
+        <Download className="h-4 w-4" aria-hidden />
+        {busy
+          ? "Installing…"
+          : isIos
+            ? "Add to Home Screen"
             : deferred
-              ? null
-              : "Open this site in Chrome/Edge on your phone, then tap Install app again — or use the browser’s Install / Add to Home Screen menu."}
-        </p>
+              ? "Install app"
+              : "Install app"}
+      </button>
+
+      {(showHowTo || isIos) && (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--tan)] px-4 py-3 text-sm text-[var(--fg)]">
+          {isIos ? (
+            <>
+              <p className="font-medium text-[var(--accent)]">
+                iPhone / iPad — Safari only
+              </p>
+              <ol className="mt-2 list-decimal space-y-2 pl-5 text-[var(--fg)]">
+                <li className="flex flex-wrap items-center gap-1">
+                  Tap <Share className="inline h-4 w-4 text-[var(--accent)]" aria-hidden />{" "}
+                  <strong>Share</strong> at the bottom of Safari
+                </li>
+                <li className="flex flex-wrap items-center gap-1">
+                  Scroll and tap{" "}
+                  <PlusSquare className="inline h-4 w-4 text-[var(--accent)]" aria-hidden />{" "}
+                  <strong>Add to Home Screen</strong>
+                </li>
+                <li>
+                  Tap <strong>Add</strong> — Restman appears like an app
+                </li>
+              </ol>
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                Apple doesn’t allow one-tap install from the page. If you don’t
+                see Share, open this site in Safari (not Chrome/Instagram).
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium text-[var(--accent)]">Install from your browser</p>
+              <p className="mt-1 text-[var(--muted)]">
+                Use the browser menu → <strong>Install app</strong> or{" "}
+                <strong>Add to Home screen</strong>. On Android Chrome the
+                install banner may also appear at the top.
+              </p>
+            </>
+          )}
+          {showHowTo && !isIos && (
+            <button
+              type="button"
+              className="mt-2 text-xs text-[var(--accent)] underline"
+              onClick={() => setShowHowTo(false)}
+            >
+              Dismiss
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
@@ -119,9 +175,7 @@ export function InstallAppButton({
 export function PwaRegister() {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("/sw.js").catch(() => {
-      /* ignore — install still works when SW eventually registers */
-    });
+    void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
   }, []);
   return null;
 }
