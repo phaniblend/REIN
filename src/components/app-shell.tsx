@@ -45,7 +45,7 @@ const allLinks: NavLink[] = [
     href: "/recipes",
     label: "Recipes",
     icon: ChefHat,
-    roles: ["OWNER", "CHEF"],
+    roles: ["OWNER"],
   },
   { href: "/menu", label: "Menu", icon: UtensilsCrossed, roles: ["OWNER"] },
   {

@@ -11,8 +11,8 @@ import { jsonError, jsonOk } from "@/lib/api";
 export async function POST() {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF"].includes(session.role)) {
-    return jsonError("Forbidden", 403);
+  if (session.role !== "CHEF") {
+    return jsonError("Only the chef can reopen recipes", 403);
   }
 
   try {

@@ -64,6 +64,19 @@ export default function RecipesPage() {
   const [newUnit, setNewUnit] = useState("G");
   const [repaired, setRepaired] = useState(false);
 
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unauthorized");
+      return data as { user: { role: string } };
+    },
+  });
+
+  const isChef = me.data?.user?.role === "CHEF";
+  const isOwner = me.data?.user?.role === "OWNER";
+
   const menu = useQuery({
     queryKey: ["menu"],
     queryFn: async () => {
@@ -82,11 +95,12 @@ export default function RecipesPage() {
       if (!res.ok) throw new Error(data.error ?? "Failed to load ingredients");
       return data as { ingredients: Ingredient[] };
     },
+    enabled: isChef,
   });
 
   // Recover dishes wrongly auto-approved with the menu (no chef signature yet).
   useEffect(() => {
-    if (repaired) return;
+    if (repaired || !isChef) return;
     let cancelled = false;
     (async () => {
       const res = await fetch("/api/menu/reopen-recipes", { method: "POST" });
@@ -102,7 +116,7 @@ export default function RecipesPage() {
     return () => {
       cancelled = true;
     };
-  }, [qc, repaired]);
+  }, [qc, repaired, isChef]);
 
   const save = useMutation({
     mutationFn: async ({
@@ -201,6 +215,7 @@ export default function RecipesPage() {
   }, [editableMenu]);
 
   function openDish(item: MenuItem) {
+    if (!isChef) return;
     setOpenId(item.id);
     setMessage(null);
     setLines(
@@ -252,14 +267,15 @@ export default function RecipesPage() {
     <div className="animate-rise space-y-4 pb-8">
       <div>
         <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
-          Owner-approved menu
+          {isOwner ? "Recipe progress" : "Owner-approved menu"}
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Tap a dish, set grocery items and quantities for one portion, then
-          finalize. One-time setup — not per order.
+          {isOwner
+            ? "You finalize dishes on Menu. Only the chef can set grocery recipes and re-edit them."
+            : "Tap a dish, set grocery items and quantities for one portion, then finalize. You can re-edit anytime."}
         </p>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          {done.length} recipes done · {pending.length} need your input
+          {done.length} recipes done · {pending.length} awaiting chef
         </p>
       </div>
 
@@ -306,37 +322,52 @@ export default function RecipesPage() {
               {category}
             </h2>
             {categoryItems.map((item) => {
-              const open = openId === item.id;
+              const open = isChef && openId === item.id;
               const signed = Boolean(item.chefSignedAt);
               return (
                 <Card
                   key={item.id}
                   className={`space-y-3 ${open ? "ring-1 ring-[var(--accent)]" : ""}`}
                 >
-                  <button
-                    type="button"
-                    className="flex w-full items-start justify-between gap-2 text-left"
-                    onClick={() => (open ? setOpenId(null) : openDish(item))}
-                  >
-                    <div>
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-xs text-[var(--muted)]">
-                        {money(num(item.sellingPrice))} ·{" "}
-                        {(item.recipe?.length ?? 0) > 0
-                          ? `${item.recipe.length} ingredient${item.recipe.length === 1 ? "" : "s"}`
-                          : "No recipe yet"}
-                      </p>
+                  {isChef ? (
+                    <button
+                      type="button"
+                      className="flex w-full items-start justify-between gap-2 text-left"
+                      onClick={() => (open ? setOpenId(null) : openDish(item))}
+                    >
+                      <div>
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {money(num(item.sellingPrice))} ·{" "}
+                          {(item.recipe?.length ?? 0) > 0
+                            ? `${item.recipe.length} ingredient${item.recipe.length === 1 ? "" : "s"}`
+                            : "No recipe yet"}
+                        </p>
+                      </div>
+                      <Badge>
+                        {open
+                          ? "Editing"
+                          : signed
+                            ? "Tap to revise"
+                            : (item.recipe?.length ?? 0) > 0
+                              ? "Tap to edit"
+                              : "Tap to add"}
+                      </Badge>
+                    </button>
+                  ) : (
+                    <div className="flex w-full items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {money(num(item.sellingPrice))} ·{" "}
+                          {(item.recipe?.length ?? 0) > 0
+                            ? `${item.recipe.length} ingredient${item.recipe.length === 1 ? "" : "s"}`
+                            : "No recipe yet"}
+                        </p>
+                      </div>
+                      <Badge>{signed ? "Chef finalized" : "Awaiting chef"}</Badge>
                     </div>
-                    <Badge>
-                      {open
-                        ? "Editing"
-                        : signed
-                          ? "Tap to revise"
-                          : (item.recipe?.length ?? 0) > 0
-                            ? "Tap to edit"
-                            : "Tap to add"}
-                    </Badge>
-                  </button>
+                  )}
 
                   {open && (
                     <div className="space-y-3 border-t border-[var(--border)] pt-3">

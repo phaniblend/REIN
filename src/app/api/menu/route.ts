@@ -63,8 +63,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF"].includes(session.role)) {
-    return jsonError("Forbidden", 403);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can add dishes", 403);
   }
 
   try {

@@ -250,14 +250,15 @@ export default function MenuPage() {
     <div className="animate-rise space-y-4 pb-8">
       <div>
         <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
-          Menu & recipes
+          Menu
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Generate, edit, and finalize dishes before they appear on POS.
+          Generate, edit, and finalize dishes for POS. The chef fills and
+          finalizes each recipe separately.
         </p>
         {items.length > 0 && (
           <p className="mt-1 text-xs text-[var(--muted)]">
-            {approvedCount} finalized · {pendingCount} awaiting approval ·{" "}
+            {approvedCount} dishes finalized · {pendingCount} awaiting approval ·{" "}
             {items.length} total
           </p>
         )}
@@ -265,10 +266,10 @@ export default function MenuPage() {
 
       {pendingCount > 0 && (
         <Card className="space-y-3 border-[var(--accent)]/30">
-          <CardTitle>Ready to finalize?</CardTitle>
+          <CardTitle>Ready to finalize dishes?</CardTitle>
           <p className="text-sm text-[var(--muted)]">
-            Review prices and names below, then finalize so waiters can punch
-            these dishes on POS.
+            Review prices and names below, then finalize so they appear on POS.
+            Recipe groceries stay with the chef.
           </p>
           <Button
             onClick={() => {

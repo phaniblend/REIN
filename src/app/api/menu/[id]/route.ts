@@ -28,8 +28,8 @@ export async function PATCH(
 ) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF"].includes(session.role)) {
-    return jsonError("Forbidden", 403);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can edit or finalize dishes", 403);
   }
 
   const { id } = await context.params;
@@ -49,7 +49,7 @@ export async function PATCH(
     if (body.isActive !== undefined) updates.isActive = body.isActive;
 
     if (body.action === "approve") {
-      // Owner approves dish for POS; chef still fills recipe separately.
+      // Owner approves dish for POS; chef fills/finalizes recipe separately.
       updates.menuApprovalStatus = "APPROVED";
       updates.ownerApprovedAt = new Date();
       updates.isActive = true;
@@ -85,8 +85,8 @@ export async function DELETE(
 ) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF"].includes(session.role)) {
-    return jsonError("Forbidden", 403);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can remove dishes", 403);
   }
 
   const { id } = await context.params;
