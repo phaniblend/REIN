@@ -2,7 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { Card, CardTitle } from "@/components/ui/card";
+import { homePathForRole } from "@/lib/auth";
 import { money, num } from "@/lib/utils";
 import { DataAlert, MiniBarChart, StatTile } from "@/components/ui/data-viz";
 
@@ -16,12 +19,15 @@ type Ingredient = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
+
   const me = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
       const res = await fetch("/api/auth/me");
       if (!res.ok) throw new Error("Unauthorized");
       return res.json() as Promise<{
+        user: { role: string };
         restaurant: {
           cuisineType: string;
           city: string;
@@ -31,6 +37,13 @@ export default function DashboardPage() {
       }>;
     },
   });
+
+  useEffect(() => {
+    const role = me.data?.user?.role;
+    if (!role || role === "OWNER") return;
+    const home = homePathForRole(role);
+    if (home !== "/dashboard") router.replace(home);
+  }, [me.data?.user?.role, router]);
 
   const ingredients = useQuery({
     queryKey: ["ingredients"],
@@ -47,6 +60,16 @@ export default function DashboardPage() {
       return res.json() as Promise<{ menuItems: unknown[] }>;
     },
   });
+
+  const role = me.data?.user?.role;
+  if (
+    me.isLoading ||
+    (role && role !== "OWNER" && homePathForRole(role) !== "/dashboard")
+  ) {
+    return (
+      <p className="text-sm text-[var(--muted)]">Opening your workspace…</p>
+    );
+  }
 
   const stock = ingredients.data?.ingredients ?? [];
   const low = stock.filter(

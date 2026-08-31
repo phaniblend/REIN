@@ -2,13 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { num } from "@/lib/utils";
+import { money, num } from "@/lib/utils";
 
 type RecipeLine = {
   ingredientId: string;
@@ -22,7 +22,9 @@ type MenuItem = {
   id: string;
   name: string;
   category: string;
+  sellingPrice: string;
   isActive: boolean;
+  menuApprovalStatus: string;
   recipeApprovalStatus: string;
   chefSignedAt: string | null;
   recipe: RecipeLine[];
@@ -44,11 +46,12 @@ type EditLine = {
 };
 
 function needsChefRecipe(item: MenuItem) {
-  return (
-    item.isActive !== false &&
-    item.recipeApprovalStatus !== "APPROVED" &&
-    item.recipeApprovalStatus !== "REJECTED"
-  );
+  if (item.isActive === false) return false;
+  if (item.menuApprovalStatus !== "APPROVED") return false;
+  // Chef has signed → done
+  if (item.chefSignedAt) return false;
+  if (item.recipeApprovalStatus === "REJECTED") return false;
+  return true;
 }
 
 export default function RecipesPage() {
@@ -59,6 +62,7 @@ export default function RecipesPage() {
   const [newName, setNewName] = useState("");
   const [newQty, setNewQty] = useState("");
   const [newUnit, setNewUnit] = useState("G");
+  const [repaired, setRepaired] = useState(false);
 
   const menu = useQuery({
     queryKey: ["menu"],
@@ -79,6 +83,26 @@ export default function RecipesPage() {
       return data as { ingredients: Ingredient[] };
     },
   });
+
+  // Recover dishes wrongly auto-approved with the menu (no chef signature yet).
+  useEffect(() => {
+    if (repaired) return;
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/menu/reopen-recipes", { method: "POST" });
+      if (cancelled) return;
+      setRepaired(true);
+      if (res.ok) {
+        const data = (await res.json()) as { reopened?: number };
+        if ((data.reopened ?? 0) > 0) {
+          qc.invalidateQueries({ queryKey: ["menu"] });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [qc, repaired]);
 
   const save = useMutation({
     mutationFn: async ({
@@ -132,13 +156,49 @@ export default function RecipesPage() {
 
   const items = menu.data?.menuItems ?? [];
   const pending = useMemo(() => items.filter(needsChefRecipe), [items]);
-  const done = useMemo(
+  const waitingOnOwner = useMemo(
     () =>
       items.filter(
-        (i) => i.isActive !== false && i.recipeApprovalStatus === "APPROVED",
+        (i) =>
+          i.isActive !== false &&
+          i.menuApprovalStatus !== "APPROVED" &&
+          i.menuApprovalStatus !== "REJECTED",
       ),
     [items],
   );
+  // Only chef-signed dishes count as done (owner finalize must not lock these).
+  const done = useMemo(
+    () =>
+      items.filter(
+        (i) =>
+          i.isActive !== false &&
+          i.menuApprovalStatus === "APPROVED" &&
+          Boolean(i.chefSignedAt),
+      ),
+    [items],
+  );
+
+  const editableMenu = useMemo(
+    () =>
+      items.filter(
+        (i) =>
+          i.isActive !== false &&
+          i.menuApprovalStatus === "APPROVED" &&
+          i.recipeApprovalStatus !== "REJECTED",
+      ),
+    [items],
+  );
+
+  const groupedEditable = useMemo(() => {
+    const map = new Map<string, MenuItem[]>();
+    for (const item of editableMenu) {
+      const key = item.category?.trim() || "Uncategorized";
+      const list = map.get(key) ?? [];
+      list.push(item);
+      map.set(key, list);
+    }
+    return [...map.entries()];
+  }, [editableMenu]);
 
   function openDish(item: MenuItem) {
     setOpenId(item.id);
@@ -192,222 +252,224 @@ export default function RecipesPage() {
     <div className="animate-rise space-y-4 pb-8">
       <div>
         <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
-          Recipe setup
+          Owner-approved menu
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          This is management&apos;s recommended menu. Fill each dish with grocery
-          items and quantities, then finalize. One-time setup — not per order.
+          Tap a dish, set grocery items and quantities for one portion, then
+          finalize. One-time setup — not per order.
         </p>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          {done.length} finalized · {pending.length} remaining
+          {done.length} recipes done · {pending.length} need your input
         </p>
       </div>
 
-      {pending.length === 0 && items.length > 0 && (
-        <Card className="space-y-2">
-          <CardTitle>All recipes finalized</CardTitle>
+      {waitingOnOwner.length > 0 && (
+        <Card className="space-y-1">
+          <CardTitle>Waiting on owner</CardTitle>
           <p className="text-sm text-[var(--muted)]">
-            Kitchen can run from these recipes.
+            {waitingOnOwner.length} dish
+            {waitingOnOwner.length === 1 ? "" : "es"} not finalized by the owner
+            yet. They’ll show up here after menu finalize.
           </p>
-          <Link
-            href="/orders"
-            className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-fg)]"
-          >
-            Go to kitchen queue
-          </Link>
         </Card>
       )}
 
-      {pending.length === 0 && items.length === 0 && (
+      {pending.length === 0 &&
+        waitingOnOwner.length === 0 &&
+        done.length > 0 && (
+          <Card className="space-y-2">
+            <CardTitle>All recipes finalized</CardTitle>
+            <p className="text-sm text-[var(--muted)]">
+              Tap any dish below to revise ingredients anytime.
+            </p>
+            <Link
+              href="/orders"
+              className="inline-flex h-10 items-center justify-center rounded-full bg-[var(--accent)] px-4 text-sm font-medium text-[var(--accent-fg)]"
+            >
+              Go to kitchen queue
+            </Link>
+          </Card>
+        )}
+
+      {items.length === 0 && (
         <p className="text-sm text-[var(--muted)]">
-          No recommended menu yet — ask the owner to generate one first.
+          No menu yet — ask the owner to generate and finalize the menu first.
         </p>
       )}
 
       {message && <p className="text-sm text-[var(--muted)]">{message}</p>}
 
-      <div className="space-y-3">
-        {pending.map((item) => {
-          const open = openId === item.id;
-          return (
-            <Card key={item.id} className="space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-xs text-[var(--muted)]">{item.category}</p>
-                </div>
-                <Badge>
-                  {(item.recipe?.length ?? 0) > 0 ? "Needs review" : "Empty recipe"}
-                </Badge>
-              </div>
-
-              {!open ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  type="button"
-                  onClick={() => openDish(item)}
+      <div className="space-y-6">
+        {groupedEditable.map(([category, categoryItems]) => (
+          <section key={category} className="space-y-2">
+            <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--accent)]">
+              {category}
+            </h2>
+            {categoryItems.map((item) => {
+              const open = openId === item.id;
+              const signed = Boolean(item.chefSignedAt);
+              return (
+                <Card
+                  key={item.id}
+                  className={`space-y-3 ${open ? "ring-1 ring-[var(--accent)]" : ""}`}
                 >
-                  Fill recipe
-                </Button>
-              ) : (
-                <div className="space-y-3">
-                  {lines.map((line) => (
-                    <div
-                      key={line.key}
-                      className="grid grid-cols-[1fr_88px_auto] items-end gap-2"
-                    >
-                      <div>
-                        <Label>Grocery</Label>
-                        <Input value={line.name} readOnly />
-                      </div>
-                      <div>
-                        <Label>Qty ({line.unit})</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.001"
-                          value={line.grossQuantity}
-                          onChange={(e) =>
-                            setLines((prev) =>
-                              prev.map((l) =>
-                                l.key === line.key
-                                  ? { ...l, grossQuantity: e.target.value }
-                                  : l,
-                              ),
-                            )
-                          }
-                        />
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        type="button"
-                        onClick={() =>
-                          setLines((prev) =>
-                            prev.filter((l) => l.key !== line.key),
-                          )
-                        }
-                      >
-                        ✕
-                      </Button>
+                  <button
+                    type="button"
+                    className="flex w-full items-start justify-between gap-2 text-left"
+                    onClick={() => (open ? setOpenId(null) : openDish(item))}
+                  >
+                    <div>
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-xs text-[var(--muted)]">
+                        {money(num(item.sellingPrice))} ·{" "}
+                        {(item.recipe?.length ?? 0) > 0
+                          ? `${item.recipe.length} ingredient${item.recipe.length === 1 ? "" : "s"}`
+                          : "No recipe yet"}
+                      </p>
                     </div>
-                  ))}
+                    <Badge>
+                      {open
+                        ? "Editing"
+                        : signed
+                          ? "Tap to revise"
+                          : (item.recipe?.length ?? 0) > 0
+                            ? "Tap to edit"
+                            : "Tap to add"}
+                    </Badge>
+                  </button>
 
-                  <div className="space-y-2 rounded-2xl bg-[var(--tan)] p-3">
-                    <p className="text-xs font-medium text-[var(--accent)]">
-                      Add grocery item
-                    </p>
-                    <select
-                      className="flex h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm"
-                      defaultValue=""
-                      onChange={(e) => {
-                        if (e.target.value) addExisting(e.target.value);
-                        e.target.value = "";
-                      }}
-                    >
-                      <option value="">Pick from stock list…</option>
-                      {(ingredients.data?.ingredients ?? []).map((ing) => (
-                        <option key={ing.id} value={ing.id}>
-                          {ing.name} ({ing.unit})
-                        </option>
+                  {open && (
+                    <div className="space-y-3 border-t border-[var(--border)] pt-3">
+                      {lines.map((line) => (
+                        <div
+                          key={line.key}
+                          className="grid grid-cols-[1fr_88px_auto] items-end gap-2"
+                        >
+                          <div>
+                            <Label>Grocery</Label>
+                            <Input value={line.name} readOnly />
+                          </div>
+                          <div>
+                            <Label>Qty ({line.unit})</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.001"
+                              value={line.grossQuantity}
+                              onChange={(e) =>
+                                setLines((prev) =>
+                                  prev.map((l) =>
+                                    l.key === line.key
+                                      ? { ...l, grossQuantity: e.target.value }
+                                      : l,
+                                  ),
+                                )
+                              }
+                            />
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            type="button"
+                            onClick={() =>
+                              setLines((prev) =>
+                                prev.filter((l) => l.key !== line.key),
+                              )
+                            }
+                          >
+                            ✕
+                          </Button>
+                        </div>
                       ))}
-                    </select>
-                    <div className="grid grid-cols-[1fr_72px_72px] gap-2">
-                      <Input
-                        placeholder="Or new item name"
-                        value={newName}
-                        onChange={(e) => setNewName(e.target.value)}
-                      />
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.001"
-                        placeholder="Qty"
-                        value={newQty}
-                        onChange={(e) => setNewQty(e.target.value)}
-                      />
-                      <select
-                        className="flex h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 text-sm"
-                        value={newUnit}
-                        onChange={(e) => setNewUnit(e.target.value)}
-                      >
-                        {["G", "KG", "ML", "L", "PIECE", "PACKET"].map((u) => (
-                          <option key={u} value={u}>
-                            {u}
-                          </option>
-                        ))}
-                      </select>
+
+                      <div className="space-y-2 rounded-2xl bg-[var(--tan)] p-3">
+                        <p className="text-xs font-medium text-[var(--accent)]">
+                          Add grocery item
+                        </p>
+                        <select
+                          className="flex h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm"
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) addExisting(e.target.value);
+                            e.target.value = "";
+                          }}
+                        >
+                          <option value="">Pick from stock list…</option>
+                          {(ingredients.data?.ingredients ?? []).map((ing) => (
+                            <option key={ing.id} value={ing.id}>
+                              {ing.name} ({ing.unit})
+                            </option>
+                          ))}
+                        </select>
+                        <div className="grid grid-cols-[1fr_72px_72px] gap-2">
+                          <Input
+                            placeholder="Or new item name"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                          />
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.001"
+                            placeholder="Qty"
+                            value={newQty}
+                            onChange={(e) => setNewQty(e.target.value)}
+                          />
+                          <select
+                            className="flex h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-2 text-sm"
+                            value={newUnit}
+                            onChange={(e) => setNewUnit(e.target.value)}
+                          >
+                            {["G", "KG", "ML", "L", "PIECE", "PACKET"].map(
+                              (u) => (
+                                <option key={u} value={u}>
+                                  {u}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          type="button"
+                          onClick={addCustom}
+                        >
+                          Add line
+                        </Button>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          type="button"
+                          disabled={save.isPending}
+                          onClick={() =>
+                            save.mutate({ id: item.id, finalize: false })
+                          }
+                        >
+                          Save draft
+                        </Button>
+                        <Button
+                          size="sm"
+                          type="button"
+                          disabled={save.isPending}
+                          onClick={() =>
+                            save.mutate({ id: item.id, finalize: true })
+                          }
+                        >
+                          {save.isPending ? "Saving…" : "Finalize dish"}
+                        </Button>
+                      </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      type="button"
-                      onClick={addCustom}
-                    >
-                      Add line
-                    </Button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      type="button"
-                      disabled={save.isPending}
-                      onClick={() =>
-                        save.mutate({ id: item.id, finalize: false })
-                      }
-                    >
-                      Save draft
-                    </Button>
-                    <Button
-                      size="sm"
-                      type="button"
-                      disabled={save.isPending}
-                      onClick={() =>
-                        save.mutate({ id: item.id, finalize: true })
-                      }
-                    >
-                      {save.isPending ? "Saving…" : "Finalize dish"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      type="button"
-                      onClick={() => setOpenId(null)}
-                    >
-                      Close
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card>
-          );
-        })}
+                  )}
+                </Card>
+              );
+            })}
+          </section>
+        ))}
       </div>
-
-      {done.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="font-[family-name:var(--font-display)] text-lg font-semibold text-[var(--accent)]">
-            Finalized recipes
-          </h2>
-          {done.map((item) => (
-            <Card
-              key={item.id}
-              className="flex items-center justify-between gap-2"
-            >
-              <div>
-                <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-[var(--muted)]">
-                  {item.recipe?.length ?? 0} ingredients
-                </p>
-              </div>
-              <Badge>Finalized</Badge>
-            </Card>
-          ))}
-        </section>
-      )}
     </div>
   );
 }

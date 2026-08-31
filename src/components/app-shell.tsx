@@ -27,7 +27,18 @@ type NavLink = {
 };
 
 const allLinks: NavLink[] = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
+  {
+    href: "/dashboard",
+    label: "Home",
+    icon: LayoutDashboard,
+    roles: ["OWNER", "WAITER", "STOCK_CLERK"],
+  },
+  {
+    href: "/recipes",
+    label: "Home",
+    icon: LayoutDashboard,
+    roles: ["CHEF"],
+  },
   { href: "/team", label: "Team", icon: Users, roles: ["OWNER"] },
   { href: "/inventory", label: "Stock", icon: Package },
   {
@@ -73,9 +84,16 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
 
-  const links = allLinks.filter(
-    (l) => !l.roles || l.roles.includes(role),
-  );
+  const links = allLinks
+    .filter((l) => !l.roles || l.roles.includes(role))
+    // Chef gets Home → Recipes; don't also show a second Recipes tab.
+    .filter((l, _i, arr) => {
+      if (role !== "CHEF") return true;
+      if (l.label === "Recipes" && arr.some((x) => x.label === "Home" && x.href === "/recipes")) {
+        return false;
+      }
+      return true;
+    });
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });

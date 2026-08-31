@@ -14,6 +14,7 @@ type MenuItem = {
   isActive: boolean;
   menuApprovalStatus?: string;
   recipeApprovalStatus?: string;
+  chefSignedAt?: string | null;
 };
 type Order = {
   id: string;
@@ -61,8 +62,9 @@ export default function OrdersPage() {
       (menu.data?.menuItems ?? []).filter(
         (i) =>
           i.isActive !== false &&
-          i.recipeApprovalStatus !== "APPROVED" &&
-          i.recipeApprovalStatus !== "REJECTED",
+          i.menuApprovalStatus === "APPROVED" &&
+          i.recipeApprovalStatus !== "REJECTED" &&
+          !i.chefSignedAt,
       ).length,
     [menu.data?.menuItems],
   );

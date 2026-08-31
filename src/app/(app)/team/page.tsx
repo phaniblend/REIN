@@ -35,7 +35,7 @@ export default function TeamPage() {
   const qc = useQueryClient();
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState<Role>("WAITER");
+  const [role, setRole] = useState<Role>("CHEF");
   const [lastLink, setLastLink] = useState<string | null>(null);
   const [copyNote, setCopyNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +91,24 @@ export default function TeamPage() {
       const res = await fetch(`/api/staff/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not remove");
+      return data;
+    },
+    onSuccess: () => {
+      setError(null);
+      qc.invalidateQueries({ queryKey: ["staff"] });
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
+  const changeRole = useMutation({
+    mutationFn: async ({ id, role }: { id: string; role: Role }) => {
+      const res = await fetch(`/api/staff/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not update role");
       return data;
     },
     onSuccess: () => {
@@ -247,8 +265,8 @@ export default function TeamPage() {
             value={role}
             onChange={(e) => setRole(e.target.value as Role)}
           >
+            <option value="CHEF">Chef — fill recipes & kitchen</option>
             <option value="WAITER">Waiter — take orders / mark served</option>
-            <option value="CHEF">Chef — recipes & kitchen</option>
             <option value="STOCK_CLERK">Stock clerk — inventory</option>
           </select>
         </div>
@@ -383,8 +401,26 @@ export default function TeamPage() {
                 <p className="font-medium">{m.name}</p>
                 <p className="text-xs text-[var(--muted)]">{m.phone ?? "—"}</p>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Badge>{m.role}</Badge>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                {m.role !== "OWNER" ? (
+                  <select
+                    className="h-8 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 text-xs"
+                    value={m.role}
+                    disabled={changeRole.isPending}
+                    onChange={(e) =>
+                      changeRole.mutate({
+                        id: m.id,
+                        role: e.target.value as Role,
+                      })
+                    }
+                  >
+                    <option value="WAITER">Waiter</option>
+                    <option value="CHEF">Chef</option>
+                    <option value="STOCK_CLERK">Stock</option>
+                  </select>
+                ) : (
+                  <Badge>{m.role}</Badge>
+                )}
                 {m.role !== "OWNER" && (
                   <Button
                     size="sm"

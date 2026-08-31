@@ -49,8 +49,8 @@ export async function PATCH(
     if (body.isActive !== undefined) updates.isActive = body.isActive;
 
     if (body.action === "approve") {
+      // Owner approves dish for POS; chef still fills recipe separately.
       updates.menuApprovalStatus = "APPROVED";
-      updates.recipeApprovalStatus = "APPROVED";
       updates.ownerApprovedAt = new Date();
       updates.isActive = true;
     } else if (body.action === "reject") {

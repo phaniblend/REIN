@@ -8,8 +8,8 @@ import { jsonError, jsonOk } from "@/lib/api";
 export async function POST() {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF"].includes(session.role)) {
-    return jsonError("Forbidden", 403);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can finalize the menu for POS", 403);
   }
 
   try {
@@ -17,7 +17,7 @@ export async function POST() {
       .update(menuItems)
       .set({
         menuApprovalStatus: "APPROVED",
-        recipeApprovalStatus: "APPROVED",
+        // Recipes stay pending for the chef to fill/sign — do not auto-approve.
         ownerApprovedAt: new Date(),
         isActive: true,
       })

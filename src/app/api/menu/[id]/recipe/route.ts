@@ -102,6 +102,9 @@ export async function PUT(
     };
     if (body.finalize) {
       updates.chefSignedAt = new Date();
+    } else {
+      // Draft/re-edit clears chef sign-off so dish returns to the setup queue.
+      updates.chefSignedAt = null;
     }
 
     const [menuItem] = await db

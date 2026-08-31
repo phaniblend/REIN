@@ -97,12 +97,28 @@ export async function getSession(): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, secretKey());
     if (!payload.sub || typeof payload.restaurantId !== "string") return null;
+
+    // Prefer live DB role/name so Team role changes apply without re-login.
+    const [user] = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        role: users.role,
+        restaurantId: users.restaurantId,
+      })
+      .from(users)
+      .where(eq(users.id, payload.sub))
+      .limit(1);
+
+    if (!user || user.restaurantId !== payload.restaurantId) return null;
+
     return {
-      id: payload.sub,
-      email: String(payload.email ?? ""),
-      name: String(payload.name ?? ""),
-      role: payload.role as SessionUser["role"],
-      restaurantId: payload.restaurantId,
+      id: user.id,
+      email: user.email ?? String(payload.email ?? ""),
+      name: user.name ?? String(payload.name ?? ""),
+      role: user.role as SessionUser["role"],
+      restaurantId: user.restaurantId,
     };
   } catch {
     return null;
