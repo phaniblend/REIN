@@ -8,16 +8,19 @@ export const menuRecipeSuggestionSchema = z.object({
       name: z.string(),
       category: z.string(),
       sellingPrice: z.number().positive(),
-      ingredients: z.array(
-        z.object({
-          name: z.string(),
-          category: z.string(),
-          unit: unitSchema,
-          grossQuantity: z.number().positive(),
-          shrinkageMarginPercent: z.number().min(0).max(50).default(5),
-          estimatedCostPerUnit: z.number().positive().optional(),
-        }),
-      ),
+      // Optional — chef fills recipes; keep empty for fast menu gen.
+      ingredients: z
+        .array(
+          z.object({
+            name: z.string(),
+            category: z.string(),
+            unit: unitSchema,
+            grossQuantity: z.number().positive(),
+            shrinkageMarginPercent: z.number().min(0).max(50).default(5),
+            estimatedCostPerUnit: z.number().positive().optional(),
+          }),
+        )
+        .default([]),
     }),
   ),
 });
@@ -97,11 +100,12 @@ async function generateContentOnce(
       "Content-Type": "application/json",
       "x-goog-api-key": apiKey,
     },
+    signal: AbortSignal.timeout(55_000),
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.4,
-        maxOutputTokens: 16384,
+        maxOutputTokens: 8192,
         responseMimeType: "application/json",
       },
     }),
@@ -264,8 +268,8 @@ async function generateJson<T>(prompt: string, schema: z.ZodType<T>): Promise<T>
 
 type MenuBatch = { label: string; count: number; detail: string };
 
-/** Keep each Gemini call small so JSON doesn't truncate mid-array. */
-function splitBatches(batches: MenuBatch[], maxPerCall = 4): MenuBatch[] {
+/** Dish-only JSON is small — larger batches are fine. */
+function splitBatches(batches: MenuBatch[], maxPerCall = 12): MenuBatch[] {
   const out: MenuBatch[] = [];
   for (const batch of batches) {
     let remaining = batch.count;
@@ -357,6 +361,41 @@ function genericMenuBatches(total: number): MenuBatch[] {
   ];
 }
 
+function veganIndianBatches(): MenuBatch[] {
+  return [
+    {
+      label: "Vegan Appetizers",
+      count: 8,
+      detail:
+        '100% vegan Indian starters (no dairy, no honey). Category "Appetizers".',
+    },
+    {
+      label: "Vegan Soups & Salads",
+      count: 4,
+      detail:
+        '100% vegan Indian soups and salads. Category "Soups & Salads".',
+    },
+    {
+      label: "Vegan Mains",
+      count: 12,
+      detail:
+        '100% vegan Indian mains (dal, sabzi, jackfruit, tofu — no paneer/ghee/cream). Category "Main Course — Veg".',
+    },
+    {
+      label: "Vegan Breads, Rice & Sides",
+      count: 8,
+      detail:
+        'Vegan breads/rice/sides (no butter naan). Categories "Breads & Rice" or "Sides".',
+    },
+    {
+      label: "Vegan Desserts & Drinks",
+      count: 6,
+      detail:
+        'Vegan desserts and drinks (no dairy). Categories "Desserts" or "Beverages".',
+    },
+  ];
+}
+
 export async function suggestMenuAndRecipes(input: {
   cuisineType: string;
   restaurantName: string;
@@ -374,43 +413,59 @@ export async function suggestMenuAndRecipes(input: {
     .join(", ");
   const cuisine = input.cuisineType || "Indian";
   const focus = input.focus ?? "";
+  const isVegan = /vegan|plant[- ]?based/i.test(`${cuisine} ${focus}`);
   const isIndian = /indian|north indian|south indian|punjabi|mughlai|indo/i.test(
     `${cuisine} ${focus}`,
   );
 
-  const batches = splitBatches(
-    isIndian ? indianMenuBatches() : genericMenuBatches(requested),
-    4,
-  );
+  const sourceBatches = isVegan && isIndian
+    ? veganIndianBatches()
+    : isIndian
+      ? indianMenuBatches()
+      : genericMenuBatches(requested);
+
+  // Dish-only payloads: fewer, larger Gemini calls (avoids Railway timeouts).
+  const batches = splitBatches(sourceBatches, 16);
 
   const baseContext = `Restaurant: ${input.restaurantName}
 Cuisine: ${cuisine}
 Location: ${location || "unspecified"}
 Currency: ${input.currency ?? "USD"}
-Existing ingredients to prefer when relevant: ${(input.existingIngredients ?? []).slice(0, 40).join(", ") || "none"}
-Owner focus note: ${focus || "full dine-in lunch and dinner menu"}`;
+Owner focus note: ${focus || "full dine-in lunch and dinner menu"}
+${isVegan ? "STRICT: every dish must be vegan (no meat, fish, egg, dairy, honey, ghee)." : ""}`;
 
   const allItems: MenuRecipeSuggestion["items"] = [];
 
   for (const batch of batches) {
     const prompt = `You are a restaurant culinary ops assistant for Restman.
-Return ONLY valid compact JSON (no markdown, no comments) matching:
-{"items":[{"name":string,"category":string,"sellingPrice":number,"ingredients":[{"name":string,"category":string,"unit":"KG"|"G"|"L"|"ML"|"PIECE"|"PACKET","grossQuantity":number,"shrinkageMarginPercent":number,"estimatedCostPerUnit":number}]}]}
+Return ONLY valid compact JSON (no markdown) matching:
+{"items":[{"name":string,"category":string,"sellingPrice":number}]}
+
+Do NOT include ingredients — the chef will add recipes later.
+Keep JSON tiny and complete.
 
 ${baseContext}
 
 Section: ${batch.label}
 ${batch.detail}
-Generate exactly ${batch.count} distinct dishes.
-Keep each BOM lean: 4 to 6 key ingredients only (skip every spice/oil if redundant).
-Use portion units (G/ML). Realistic local prices.`;
+Generate exactly ${batch.count} distinct dishes with realistic local sellingPrice numbers.
+Avoid duplicate names.`;
 
     try {
       const partial = await generateJson(prompt, menuRecipeSuggestionSchema);
-      allItems.push(...partial.items.slice(0, batch.count));
+      allItems.push(
+        ...partial.items.slice(0, batch.count).map((item) => ({
+          ...item,
+          ingredients: item.ingredients ?? [],
+        })),
+      );
     } catch (err) {
-      // Soft-fail a single small batch so one truncated call doesn't wipe the run.
       console.error("[menu-gen] batch failed", batch.label, err);
+      if (err instanceof Error && /abort|timeout/i.test(err.message)) {
+        throw new Error(
+          "Menu generation timed out. Try again — dishes-only gen should finish in under a minute.",
+        );
+      }
       if (allItems.length === 0) throw err;
     }
   }

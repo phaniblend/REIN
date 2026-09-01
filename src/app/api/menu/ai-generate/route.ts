@@ -6,8 +6,8 @@ import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { suggestMenuAndRecipes } from "@/lib/gemini";
 
-/** Batched Gemini calls for a full ~40-item menu can take 1–2 minutes. */
-export const maxDuration = 300;
+/** Dish-only Gemini calls — usually under a minute. */
+export const maxDuration = 120;
 
 const schema = z.object({
   focus: z.string().optional(),

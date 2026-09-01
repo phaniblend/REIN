@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -84,24 +84,42 @@ export default function MenuPage() {
 
   const generate = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/menu/ai-generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          focus: focus || undefined,
-          count: 40,
-          persist: true,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Generation failed");
-      return data as { persisted: unknown[] };
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), 120_000);
+      try {
+        const res = await fetch("/api/menu/ai-generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+          body: JSON.stringify({
+            focus: focus || undefined,
+            count: 40,
+            persist: true,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            (data as { error?: string }).error ?? "Generation failed",
+          );
+        }
+        return data as { persisted: unknown[] };
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          throw new Error(
+            "Generation timed out. Refresh and try again — it should finish in under a minute now.",
+          );
+        }
+        throw err;
+      } finally {
+        window.clearTimeout(timer);
+      }
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["menu"] });
       qc.invalidateQueries({ queryKey: ["ingredients"] });
       setMessage(
-        `Added ${data.persisted?.length ?? 0} menu items with recipe BOMs.`,
+        `Added ${data.persisted?.length ?? 0} dishes. Finalize the ones you want on POS — chef fills recipes after.`,
       );
     },
     onError: (err) => setMessage((err as Error).message),
@@ -301,12 +319,26 @@ export default function MenuPage() {
           variant="secondary"
         >
           {generate.isPending
-            ? "Generating full menu… (1–2 min)"
+            ? "Generating dishes… (~30–60 sec)"
             : "Generate recommended menu"}
         </Button>
+        {generate.isPending && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => generate.reset()}
+          >
+            Stuck? Reset button
+          </Button>
+        )}
         <p className="text-xs text-[var(--muted)]">
-          Regenerating replaces pending/draft dishes only — finalized ones stay.
+          Builds dish names and prices only (chef adds recipes later). Regenerating
+          replaces pending/draft dishes — finalized ones stay.
         </p>
+        {message && (
+          <p className="text-sm text-[var(--muted)]">{message}</p>
+        )}
       </Card>
 
       <Card className="space-y-3">
