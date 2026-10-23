@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RestmanLogo } from "@/components/restman-logo";
-import type { UserRole } from "@/lib/auth";
+import type { UserRole } from "@/lib/roles";
 
 type NavLink = {
   href: string;

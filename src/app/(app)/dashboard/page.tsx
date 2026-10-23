@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Card, CardTitle } from "@/components/ui/card";
-import { homePathForRole } from "@/lib/auth";
+import { homePathForRole } from "@/lib/roles";
 import { money, num } from "@/lib/utils";
 import { DataAlert, MiniBarChart, StatTile } from "@/components/ui/data-viz";
 
