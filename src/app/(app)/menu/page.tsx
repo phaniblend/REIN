@@ -60,6 +60,7 @@ export default function MenuPage() {
   const qc = useQueryClient();
   const [focus, setFocus] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const generateAbort = useRef<AbortController | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
@@ -84,7 +85,9 @@ export default function MenuPage() {
 
   const generate = useMutation({
     mutationFn: async () => {
+      generateAbort.current?.abort();
       const controller = new AbortController();
+      generateAbort.current = controller;
       const timer = window.setTimeout(() => controller.abort(), 120_000);
       try {
         const res = await fetch("/api/menu/ai-generate", {
@@ -107,12 +110,15 @@ export default function MenuPage() {
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
           throw new Error(
-            "Generation timed out. Refresh and try again — it should finish in under a minute now.",
+            "Generation stopped or timed out. Tap Generate again — it should finish in under a minute.",
           );
         }
         throw err;
       } finally {
         window.clearTimeout(timer);
+        if (generateAbort.current === controller) {
+          generateAbort.current = null;
+        }
       }
     },
     onSuccess: (data) => {
@@ -327,18 +333,19 @@ export default function MenuPage() {
             type="button"
             size="sm"
             variant="outline"
-            onClick={() => generate.reset()}
+            onClick={() => {
+              generateAbort.current?.abort();
+              generate.reset();
+              setMessage("Generation cancelled. You can try again.");
+            }}
           >
-            Stuck? Reset button
+            Cancel
           </Button>
         )}
         <p className="text-xs text-[var(--muted)]">
           Builds dish names and prices only (chef adds recipes later). Regenerating
           replaces pending/draft dishes — finalized ones stay.
         </p>
-        {message && (
-          <p className="text-sm text-[var(--muted)]">{message}</p>
-        )}
       </Card>
 
       <Card className="space-y-3">
