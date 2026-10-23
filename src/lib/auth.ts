@@ -8,8 +8,10 @@ import {
   SESSION_COOKIE,
   SESSION_MAX_AGE_SEC,
 } from "@/lib/session-cookie";
+import type { UserRole } from "@/lib/roles";
 
-export type UserRole = "OWNER" | "CHEF" | "WAITER" | "STOCK_CLERK";
+export type { UserRole } from "@/lib/roles";
+export { homePathForRole } from "@/lib/roles";
 
 export type SessionUser = {
   id: string;
@@ -145,11 +147,4 @@ export async function requireSession(roles?: UserRole[]) {
 export async function getUserByEmail(email: string) {
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   return user ?? null;
-}
-
-export function homePathForRole(role: string) {
-  if (role === "CHEF") return "/recipes";
-  if (role === "WAITER") return "/orders";
-  if (role === "STOCK_CLERK") return "/inventory";
-  return "/dashboard";
 }
