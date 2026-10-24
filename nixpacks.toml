@@ -1,8 +1,9 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "openssl"]
+nixPkgs = ["nodejs_22", "openssl"]
 
 [phases.install]
-cmds = ["npm ci"]
+# NODE_ENV=production would otherwise omit Tailwind and TypeScript.
+cmds = ["npm ci --include=dev"]
 
 [phases.build]
 cmds = ["npm run build"]
@@ -11,4 +12,5 @@ cmds = ["npm run build"]
 cmd = "npm run start:railway"
 
 [variables]
+NIXPACKS_NODE_VERSION = "22"
 NODE_ENV = "production"
