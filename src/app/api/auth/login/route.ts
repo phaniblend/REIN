@@ -8,6 +8,8 @@ import {
   verifyPassword,
 } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
+import { findTestLogin } from "@/lib/test-login-accounts";
+import { ensureTestLogins } from "@/lib/test-logins";
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -17,6 +19,9 @@ const bodySchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = bodySchema.parse(await readJson(request));
+    if (findTestLogin(body.email)) {
+      await ensureTestLogins();
+    }
     const [user] = await db
       .select()
       .from(users)

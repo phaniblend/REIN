@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { RestmanLogo } from "@/components/restman-logo";
+import { TEST_LOGINS } from "@/lib/test-login-accounts";
 
 type Mode = "phone" | "email";
 type Step = "phone" | "code";
@@ -231,6 +232,28 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Signing in…" : "Sign in"}
             </Button>
+            <div className="space-y-2 rounded-2xl bg-[var(--tan)] p-3">
+              <p className="text-xs font-medium text-[var(--accent)]">
+                Temporary test logins — same password for all: {TEST_LOGINS[0].password}
+              </p>
+              <ul className="space-y-1">
+                {TEST_LOGINS.map((login) => (
+                  <li key={login.email}>
+                    <button
+                      type="button"
+                      className="text-left text-xs text-[var(--fg)] underline"
+                      onClick={() => {
+                        setEmail(login.email);
+                        setPassword(login.password);
+                        setError(null);
+                      }}
+                    >
+                      {login.role.toLowerCase().replace("_", " ")} · {login.email}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </form>
         )}
 
