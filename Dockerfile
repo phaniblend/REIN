@@ -12,7 +12,6 @@ RUN printf '%s\n' 'registry=https://registry.npmjs.org/' > /tmp/npmrc \
  && env -i PATH="$PATH" HOME=/root NPM_CONFIG_CACHE=/tmp/npm-cache \
       npm ci --include=dev \
         --userconfig=/tmp/npmrc \
-        --globalconfig=/tmp/npmrc \
         --registry=https://registry.npmjs.org/
 
 COPY . .
