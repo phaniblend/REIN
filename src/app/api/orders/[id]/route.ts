@@ -27,6 +27,9 @@ export async function PATCH(
 ) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
+  if (!["OWNER", "CHEF", "WAITER"].includes(session.role)) {
+    return jsonError("You can't change ticket status", 403);
+  }
 
   const { id } = await context.params;
 
@@ -38,6 +41,13 @@ export async function PATCH(
       .where(and(eq(orders.id, id), eq(orders.restaurantId, session.restaurantId)))
       .limit(1);
     if (!order) return jsonError("Order not found", 404);
+    if (
+      !body.itemId &&
+      order.status === "SERVED" &&
+      body.status !== "SERVED"
+    ) {
+      return jsonError("Served tickets can't go back to prep", 409);
+    }
 
     if (body.itemId) {
       await db

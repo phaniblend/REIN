@@ -31,6 +31,26 @@ type LocationStats = {
   }[];
 };
 
+const METRIC_LABELS: Record<string, string> = {
+  spoilageWastePercentOfPurchases: "Spoilage waste",
+  unaccountedShrinkPercentOfUsage: "Unaccounted shrink",
+  foodCostPercentOfSales: "Food cost",
+  grocerySpendVsTheoreticalUsagePercent: "Grocery vs theoretical usage",
+  groceryBoughtVsSoldRatio: "Bought / sold ratio",
+  typicalGrossMarginPercent: "Typical gross margin",
+  weeklyGrocerySpendUsd: "Weekly grocery spend",
+  weeklyFoodSalesUsd: "Weekly food sales",
+};
+
+function readableMetric(metric: string) {
+  if (METRIC_LABELS[metric]) return METRIC_LABELS[metric];
+  const spaced = metric
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 export default function InsightsPage() {
   const [stats, setStats] = useState<LocationStats | null>(null);
 
@@ -114,7 +134,7 @@ export default function InsightsPage() {
               {stats.benchmarks.map((b) => (
                 <li key={b.metric} className="text-sm">
                   <p className="font-medium">
-                    {b.metric}: {b.value}
+                    {readableMetric(b.metric)}: {b.value}
                     {b.unit}
                   </p>
                   <p className="text-[var(--muted)]">{b.interpretation}</p>

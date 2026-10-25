@@ -40,6 +40,8 @@ export default function OrdersPage() {
 
   const role = me.data?.user?.role;
   const isChef = role === "CHEF";
+  const canSendOrder = role === "OWNER" || role === "WAITER";
+  const canChangeStatus = role === "OWNER" || role === "CHEF" || role === "WAITER";
 
   const menu = useQuery({
     queryKey: ["menu"],
@@ -144,7 +146,7 @@ export default function OrdersPage() {
         </Card>
       )}
 
-      {!isChef && (
+      {canSendOrder && (
         <Card className="space-y-3">
           <CardTitle>New order</CardTitle>
           <Input
@@ -205,6 +207,11 @@ export default function OrdersPage() {
           >
             Send to kitchen
           </Button>
+          {create.error && (
+            <p className="text-sm text-[var(--danger)]">
+              {(create.error as Error).message}
+            </p>
+          )}
         </Card>
       )}
 
@@ -222,29 +229,42 @@ export default function OrdersPage() {
                 </li>
               ))}
             </ul>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() =>
-                  updateStatus.mutate({ id: order.id, status: "PREPARING" })
-                }
-              >
-                Prep
-              </Button>
-              <Button
-                size="sm"
-                onClick={() =>
-                  updateStatus.mutate({ id: order.id, status: "SERVED" })
-                }
-              >
-                Served
-              </Button>
-            </div>
+            {canChangeStatus && (
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={
+                    order.status === "SERVED" || updateStatus.isPending
+                  }
+                  onClick={() =>
+                    updateStatus.mutate({ id: order.id, status: "PREPARING" })
+                  }
+                >
+                  Prep
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={
+                    order.status === "SERVED" || updateStatus.isPending
+                  }
+                  onClick={() =>
+                    updateStatus.mutate({ id: order.id, status: "SERVED" })
+                  }
+                >
+                  Served
+                </Button>
+              </div>
+            )}
           </Card>
         ))}
         {(orders.data?.orders ?? []).length === 0 && (
           <p className="text-sm text-[var(--muted)]">No open tickets yet.</p>
+        )}
+        {updateStatus.error && (
+          <p className="text-sm text-[var(--danger)]">
+            {(updateStatus.error as Error).message}
+          </p>
         )}
       </div>
     </div>

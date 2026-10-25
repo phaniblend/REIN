@@ -404,6 +404,7 @@ export async function suggestMenuAndRecipes(input: {
   country?: string;
   currency?: string;
   existingIngredients?: string[];
+  existingMenuNames?: string[];
   focus?: string;
   count?: number;
 }): Promise<MenuRecipeSuggestion> {
@@ -432,7 +433,12 @@ Cuisine: ${cuisine}
 Location: ${location || "unspecified"}
 Currency: ${input.currency ?? "USD"}
 Owner focus note: ${focus || "full dine-in lunch and dinner menu"}
-${isVegan ? "STRICT: every dish must be vegan (no meat, fish, egg, dairy, honey, ghee)." : ""}`;
+${isVegan ? "STRICT: every dish must be vegan (no meat, fish, egg, dairy, honey, ghee)." : ""}
+${
+  (input.existingMenuNames ?? []).length
+    ? `Already on this menu — do not suggest these names: ${(input.existingMenuNames ?? []).slice(0, 80).join("; ")}`
+    : ""
+}`;
 
   const allItems: MenuRecipeSuggestion["items"] = [];
 
@@ -524,6 +530,8 @@ Return ONLY JSON:
     "interpretation": string
   }]
 }
+
+Each benchmark "metric" must be a short readable label such as "Spoilage waste", never a camelCase field name.
 
 Cuisine: ${input.cuisineType}
 Location: ${locationLabel}`;

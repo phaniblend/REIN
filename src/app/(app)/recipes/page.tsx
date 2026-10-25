@@ -62,6 +62,7 @@ export default function RecipesPage() {
   const [newName, setNewName] = useState("");
   const [newQty, setNewQty] = useState("");
   const [newUnit, setNewUnit] = useState("G");
+  const [pickedId, setPickedId] = useState("");
   const [repaired, setRepaired] = useState(false);
 
   const me = useQuery({
@@ -229,26 +230,41 @@ export default function RecipesPage() {
     );
     setNewName("");
     setNewQty("");
+    setPickedId("");
   }
 
-  function addExisting(ingredientId: string) {
-    const ing = ingredients.data?.ingredients.find((i) => i.id === ingredientId);
-    if (!ing) return;
-    if (lines.some((l) => l.ingredientId === ing.id)) return;
-    setLines((prev) => [
-      ...prev,
-      {
-        key: `${ing.id}-${Date.now()}`,
-        ingredientId: ing.id,
-        name: ing.name,
-        unit: ing.unit,
-        grossQuantity: "",
-      },
-    ]);
-  }
-
-  function addCustom() {
-    if (!newName.trim() || !(Number(newQty) > 0)) return;
+  function addLine() {
+    const qty = Number(newQty);
+    if (!(qty > 0)) {
+      setMessage("Enter a quantity before adding that grocery item.");
+      return;
+    }
+    if (pickedId) {
+      const ing = ingredients.data?.ingredients.find((i) => i.id === pickedId);
+      if (!ing) return;
+      if (lines.some((l) => l.ingredientId === ing.id)) {
+        setMessage("That grocery item is already on this recipe.");
+        return;
+      }
+      setLines((prev) => [
+        ...prev,
+        {
+          key: `${ing.id}-${Date.now()}`,
+          ingredientId: ing.id,
+          name: ing.name,
+          unit: ing.unit,
+          grossQuantity: newQty,
+        },
+      ]);
+      setPickedId("");
+      setNewQty("");
+      setMessage(null);
+      return;
+    }
+    if (!newName.trim()) {
+      setMessage("Pick a stock item or type a new grocery name.");
+      return;
+    }
     setLines((prev) => [
       ...prev,
       {
@@ -261,18 +277,25 @@ export default function RecipesPage() {
     ]);
     setNewName("");
     setNewQty("");
+    setMessage(null);
   }
 
   return (
     <div className="animate-rise space-y-4 pb-8">
       <div>
         <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
-          {isOwner ? "Recipe progress" : "Owner-approved menu"}
+          {isOwner
+            ? "Recipe progress"
+            : isChef
+              ? "Owner-approved menu"
+              : "Recipes"}
         </h1>
         <p className="text-sm text-[var(--muted)]">
           {isOwner
             ? "You finalize dishes on Menu. Only the chef can set grocery recipes and re-edit them."
-            : "Tap a dish, set grocery items and quantities for one portion, then finalize. You can re-edit anytime."}
+            : isChef
+              ? "Tap a dish, set grocery items and quantities for one portion, then finalize. You can re-edit anytime."
+              : "The chef sets grocery quantities. This list is read-only."}
         </p>
         <p className="mt-1 text-xs text-[var(--muted)]">
           {done.length} recipes done · {pending.length} awaiting chef
@@ -290,7 +313,8 @@ export default function RecipesPage() {
         </Card>
       )}
 
-      {pending.length === 0 &&
+      {isChef &&
+        pending.length === 0 &&
         waitingOnOwner.length === 0 &&
         done.length > 0 && (
           <Card className="space-y-2">
@@ -419,11 +443,8 @@ export default function RecipesPage() {
                         </p>
                         <select
                           className="flex h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm"
-                          defaultValue=""
-                          onChange={(e) => {
-                            if (e.target.value) addExisting(e.target.value);
-                            e.target.value = "";
-                          }}
+                          value={pickedId}
+                          onChange={(e) => setPickedId(e.target.value)}
                         >
                           <option value="">Pick from stock list…</option>
                           {(ingredients.data?.ingredients ?? []).map((ing) => (
@@ -464,7 +485,7 @@ export default function RecipesPage() {
                           size="sm"
                           variant="outline"
                           type="button"
-                          onClick={addCustom}
+                          onClick={addLine}
                         >
                           Add line
                         </Button>

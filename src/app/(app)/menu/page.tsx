@@ -74,6 +74,18 @@ export default function MenuPage() {
   });
   const [showAdd, setShowAdd] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState<MenuItem | null>(null);
+
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unauthorized");
+      return data as { user: { role: string } };
+    },
+  });
+  const isOwner = me.data?.user?.role === "OWNER";
 
   const menu = useQuery({
     queryKey: ["menu"],
@@ -106,7 +118,7 @@ export default function MenuPage() {
             (data as { error?: string }).error ?? "Generation failed",
           );
         }
-        return data as { persisted: unknown[] };
+        return data as { persisted: unknown[]; skipped?: number };
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
           throw new Error(
@@ -124,8 +136,12 @@ export default function MenuPage() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["menu"] });
       qc.invalidateQueries({ queryKey: ["ingredients"] });
+      const added = data.persisted?.length ?? 0;
+      const skipped = data.skipped ?? 0;
       setMessage(
-        `Added ${data.persisted?.length ?? 0} dishes. Finalize the ones you want on POS — chef fills recipes after.`,
+        added === 0
+          ? "No new dishes — those names are already on the menu."
+          : `Added ${added} dishes${skipped ? ` and skipped ${skipped} already on the menu` : ""}. Finalize the ones you want on POS — chef fills recipes after.`,
       );
     },
     onError: (err) => setMessage((err as Error).message),
@@ -277,8 +293,9 @@ export default function MenuPage() {
           Menu
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Generate, edit, and finalize dishes for POS. The chef fills and
-          finalizes each recipe separately.
+          {isOwner
+            ? "Generate, edit, and finalize dishes for POS. The chef fills and finalizes each recipe separately."
+            : "Dishes on the menu. Only the owner can generate, edit, or remove them."}
         </p>
         {items.length > 0 && (
           <p className="mt-1 text-xs text-[var(--muted)]">
@@ -288,7 +305,7 @@ export default function MenuPage() {
         )}
       </div>
 
-      {pendingCount > 0 && (
+      {isOwner && pendingCount > 0 && (
         <Card className="space-y-3 border-[var(--accent)]/30">
           <CardTitle>Ready to finalize dishes?</CardTitle>
           <p className="text-sm text-[var(--muted)]">
@@ -309,6 +326,7 @@ export default function MenuPage() {
         </Card>
       )}
 
+      {isOwner && (
       <Card className="space-y-3">
         <CardTitle>Recommended menu</CardTitle>
         <Input
@@ -344,10 +362,12 @@ export default function MenuPage() {
         )}
         <p className="text-xs text-[var(--muted)]">
           Builds dish names and prices only (chef adds recipes later). Regenerating
-          replaces pending/draft dishes — finalized ones stay.
+          replaces pending dishes and skips names already finalized.
         </p>
       </Card>
+      )}
 
+      {isOwner && (
       <Card className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <CardTitle>Add dish</CardTitle>
@@ -419,6 +439,7 @@ export default function MenuPage() {
           </div>
         )}
       </Card>
+      )}
 
       {message && <p className="text-sm text-[var(--muted)]">{message}</p>}
 
@@ -444,7 +465,7 @@ export default function MenuPage() {
               </span>
             </div>
             {categoryItems.map((item) => {
-              const editing = editingId === item.id;
+              const editing = isOwner && editingId === item.id;
               return (
                 <Card
                   key={item.id}
@@ -513,6 +534,7 @@ export default function MenuPage() {
                         <Badge>{item.recipe?.length ?? 0} ingredients</Badge>
                         {item.isActive === false && <Badge>Inactive</Badge>}
                       </div>
+                      {isOwner && (
                       <div className="flex flex-wrap gap-2">
                         <Button
                           size="sm"
@@ -544,20 +566,14 @@ export default function MenuPage() {
                           type="button"
                           disabled={busy}
                           onClick={() => {
-                            if (
-                              !window.confirm(
-                                `Remove “${item.name}” from the menu?`,
-                              )
-                            ) {
-                              return;
-                            }
                             setMessage(null);
-                            removeItem.mutate(item.id);
+                            setPendingRemove(item);
                           }}
                         >
                           Remove
                         </Button>
                       </div>
+                      )}
                     </>
                   )}
                 </Card>
@@ -567,11 +583,43 @@ export default function MenuPage() {
         ))}
         {visible.length === 0 && (
           <p className="text-sm text-[var(--muted)]">
-            No menu yet — generate a recommended menu or add a dish to get
-            started.
+            {isOwner
+              ? "No menu yet — generate a recommended menu or add a dish to get started."
+              : "No menu yet."}
           </p>
         )}
       </div>
+
+      {pendingRemove && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+          <Card className="w-full max-w-sm space-y-3">
+            <CardTitle>Remove dish?</CardTitle>
+            <p className="text-sm text-[var(--muted)]">
+              Remove “{pendingRemove.name}” from the menu?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setPendingRemove(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={removeItem.isPending}
+                onClick={() => {
+                  const id = pendingRemove.id;
+                  setPendingRemove(null);
+                  removeItem.mutate(id);
+                }}
+              >
+                Remove
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

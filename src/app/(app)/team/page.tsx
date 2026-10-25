@@ -33,6 +33,16 @@ type StagedContact = { phone: string; name: string };
 
 export default function TeamPage() {
   const qc = useQueryClient();
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unauthorized");
+      return data as { user: { role: string } };
+    },
+  });
+  const isOwner = me.data?.user?.role === "OWNER";
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<Role>("CHEF");
@@ -57,6 +67,7 @@ export default function TeamPage() {
       if (!res.ok) throw new Error(data.error ?? "Failed to load team");
       return data as TeamPayload;
     },
+    enabled: isOwner,
   });
 
   const invite = useMutation({
@@ -213,11 +224,15 @@ export default function TeamPage() {
           Team
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Invite staff from your contacts or by number — they open the link, no
-          separate signup.
+          {!me.data
+            ? "Loading team…"
+            : isOwner
+              ? "Invite staff from your contacts or by number — they open the link, no separate signup."
+              : "Only the owner can invite staff or change roles."}
         </p>
       </div>
 
+      {isOwner && (
       <Card className="space-y-3">
         <CardTitle>Send invite</CardTitle>
 
@@ -359,8 +374,9 @@ export default function TeamPage() {
           </div>
         )}
       </Card>
+      )}
 
-      {team.data?.invites && team.data.invites.length > 0 && (
+      {isOwner && team.data?.invites && team.data.invites.length > 0 && (
         <Card className="space-y-2">
           <CardTitle>Pending invites</CardTitle>
           <ul className="space-y-2">
@@ -389,6 +405,7 @@ export default function TeamPage() {
         </Card>
       )}
 
+      {isOwner && (
       <Card className="space-y-2">
         <CardTitle>Active team</CardTitle>
         <ul className="space-y-2">
@@ -446,6 +463,7 @@ export default function TeamPage() {
           ))}
         </ul>
       </Card>
+      )}
     </div>
   );
 }

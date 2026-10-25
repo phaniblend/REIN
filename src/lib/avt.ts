@@ -131,12 +131,15 @@ export async function computeAvT(params: {
     .map((row) => {
       const ending = params.physicalCounts[row.id];
       const received = receiptsMap[row.id] ?? 0;
-      // Prefer explicit opening snapshot; else treat currentStock as pre-count on-hand
-      // after receipts already applied in stock ledger.
+      // Receipts and spoiled/returned waste are already applied to currentStock.
+      // Opening = on-hand now, minus purchases in this window, plus waste already
+      // deducted — so purchases are not added a second time.
+      const deductedWaste =
+        (kitchenWaste[row.id] ?? 0) + (returnedWaste[row.id] ?? 0);
       const openingStock =
         params.openingStocks?.[row.id] !== undefined
           ? params.openingStocks[row.id]
-          : num(row.currentStock);
+          : num(row.currentStock) - received + deductedWaste;
 
       const physicalEndingCount = ending;
       const actualUsage = openingStock + received - physicalEndingCount;

@@ -19,7 +19,10 @@ const bodySchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = bodySchema.parse(await readJson(request));
-    if (findTestLogin(body.email)) {
+    if (
+      process.env.NODE_ENV !== "production" &&
+      findTestLogin(body.email)
+    ) {
       await ensureTestLogins();
     }
     const [user] = await db

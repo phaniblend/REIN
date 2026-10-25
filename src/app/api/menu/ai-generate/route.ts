@@ -36,6 +36,23 @@ export async function POST(request: Request) {
       .from(ingredients)
       .where(eq(ingredients.restaurantId, session.restaurantId));
 
+    const existingMenu = await db
+      .select({
+        name: menuItems.name,
+        menuApprovalStatus: menuItems.menuApprovalStatus,
+      })
+      .from(menuItems)
+      .where(eq(menuItems.restaurantId, session.restaurantId));
+    // Drafts are deleted below and can be generated again. Finalized dishes stay.
+    const keptMenu = existingMenu.filter(
+      (item) =>
+        item.menuApprovalStatus !== "PENDING_APPROVAL" &&
+        item.menuApprovalStatus !== "DRAFT",
+    );
+    const existingNames = new Set(
+      keptMenu.map((item) => item.name.trim().toLowerCase()),
+    );
+
     const suggestion = await suggestMenuAndRecipes({
       cuisineType: restaurant.cuisineType,
       restaurantName: restaurant.name,
@@ -44,6 +61,7 @@ export async function POST(request: Request) {
       country: restaurant.country,
       currency: restaurant.currency,
       existingIngredients: existingIngredients.map((i) => i.name),
+      existingMenuNames: keptMenu.map((item) => item.name),
       focus: body.focus,
       count: body.count,
     });
@@ -67,8 +85,15 @@ export async function POST(request: Request) {
       );
 
     const persisted = [];
+    let skipped = 0;
 
     for (const item of suggestion.items) {
+      const nameKey = item.name.trim().toLowerCase();
+      if (!nameKey || existingNames.has(nameKey)) {
+        skipped += 1;
+        continue;
+      }
+      existingNames.add(nameKey);
       const bomLinks: {
         ingredientId: string;
         grossQuantity: string;
@@ -126,7 +151,7 @@ export async function POST(request: Request) {
       persisted.push(menuItem);
     }
 
-    return jsonOk({ suggestion, persisted });
+    return jsonOk({ suggestion, persisted, skipped });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return jsonError(err.issues[0]?.message ?? "Invalid input");

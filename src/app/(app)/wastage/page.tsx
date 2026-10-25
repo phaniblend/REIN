@@ -10,6 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { DataAlert } from "@/components/ui/data-viz";
 
 type Ingredient = { id: string; name: string; unit: string };
+function wasteKindLabel(kind: string) {
+  if (kind === "KITCHEN_SPOILED") return "Kitchen spoiled";
+  if (kind === "POS_RETURNED_WASTE") return "Returned — wasted";
+  if (kind === "POS_RETURNED_REUSED") return "Returned — reused";
+  return kind.replaceAll("_", " ").toLowerCase();
+}
+
 type WasteRow = {
   id: string;
   ingredientName: string;
@@ -152,7 +159,7 @@ export default function WastagePage() {
           <Card key={row.id} className="space-y-1">
             <div className="flex items-center justify-between gap-2">
               <p className="font-medium">{row.ingredientName}</p>
-              <Badge>{row.kind}</Badge>
+              <Badge>{wasteKindLabel(row.kind)}</Badge>
             </div>
             <p className="text-sm text-[var(--muted)]">
               {row.quantity} · {row.reason}

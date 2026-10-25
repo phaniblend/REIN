@@ -22,7 +22,7 @@ export default function InventoryPage() {
   const qc = useQueryClient();
   const [form, setForm] = useState({
     name: "",
-    category: "Proteins",
+    category: "",
     unit: "KG",
     costPerUnit: "0",
     currentStock: "0",
@@ -62,7 +62,14 @@ export default function InventoryPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ingredients"] });
-      setForm((f) => ({ ...f, name: "", currentStock: "0" }));
+      setForm({
+        name: "",
+        category: "",
+        unit: "KG",
+        costPerUnit: "0",
+        currentStock: "0",
+        parLevel: "0",
+      });
     },
   });
 
@@ -110,6 +117,7 @@ export default function InventoryPage() {
               <Label>Category</Label>
               <Input
                 value={form.category}
+                placeholder="e.g. Grains"
                 onChange={(e) => setForm({ ...form, category: e.target.value })}
               />
             </div>
@@ -160,10 +168,15 @@ export default function InventoryPage() {
           </div>
           <Button
             onClick={() => create.mutate()}
-            disabled={!form.name || create.isPending}
+            disabled={!form.name || !form.category.trim() || create.isPending}
           >
             Save ingredient
           </Button>
+          {create.error && (
+            <p className="text-sm text-[var(--danger)]">
+              {(create.error as Error).message}
+            </p>
+          )}
         </div>
       </Card>
 

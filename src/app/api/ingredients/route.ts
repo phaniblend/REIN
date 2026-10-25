@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { ingredients } from "@/db/schema";
 import { getSession } from "@/lib/auth";
@@ -37,11 +37,26 @@ export async function POST(request: Request) {
 
   try {
     const body = createSchema.parse(await readJson(request));
+    const name = body.name.trim();
+    const [duplicate] = await db
+      .select({ id: ingredients.id })
+      .from(ingredients)
+      .where(
+        and(
+          eq(ingredients.restaurantId, session.restaurantId),
+          sql`lower(${ingredients.name}) = ${name.toLowerCase()}`,
+        ),
+      )
+      .limit(1);
+    if (duplicate) {
+      return jsonError(`An ingredient named "${name}" already exists`, 409);
+    }
+
     const [row] = await db
       .insert(ingredients)
       .values({
         restaurantId: session.restaurantId,
-        name: body.name,
+        name,
         category: body.category,
         unit: body.unit,
         costPerUnit: body.costPerUnit.toFixed(2),
