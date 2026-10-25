@@ -4,8 +4,16 @@ export default function TermsPage() {
   return (
     <main className="mx-auto max-w-lg space-y-4 px-5 py-10 text-sm leading-6">
       <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
-        Terms of use
+        Terms of Service
       </h1>
+      <h2 className="text-base font-semibold">SMS terms</h2>
+      <p>
+        Restman, registered brand My Starter Profile, texts one-time sign-in
+        codes and staff invite links only after you ask for them on
+        restman.live or an owner invites your number. Message and data rates
+        may apply. Reply STOP to opt out and HELP for help. Message frequency
+        varies.
+      </p>
       <p>
         Restman is a back-of-house tool for stock, recipes, and kitchen counts.
         It does not take card payments and it does not replace your register.

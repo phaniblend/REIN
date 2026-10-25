@@ -4,12 +4,16 @@ export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-lg space-y-4 px-5 py-10 text-sm leading-6">
       <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
-        Privacy policy
+        Privacy Policy
       </h1>
       <p>
-        Restman stores your restaurant name, staff names, mobile numbers,
-        email addresses, menu, stock, tickets, invoices, and counts so the
-        kitchen can run. We do not sell that information.
+        Restman, registered brand My Starter Profile, stores your restaurant
+        name, staff names, mobile numbers, email addresses, menu, stock,
+        tickets, invoices, and counts so the kitchen can run.
+      </p>
+      <p>
+        We do not sell or share your SMS opt-in data or personal information
+        with third parties for marketing purposes.
       </p>
       <p>
         Text codes are used to sign in and to invite staff. A code expires
