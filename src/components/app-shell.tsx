@@ -133,6 +133,7 @@ export function AppShell({
               <Link
                 key={`${href}-${label}`}
                 href={href}
+                prefetch={false}
                 className={cn(
                   "flex flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px]",
                   active

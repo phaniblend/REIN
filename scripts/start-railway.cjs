@@ -20,6 +20,9 @@ if (!process.env.DATABASE_URL) {
 console.log("→ drizzle-kit push");
 run("npx", ["drizzle-kit", "push", "--force"]);
 
+console.log("→ dedupe duplicate dishes and ingredients");
+run("node", ["scripts/dedupe-catalog.cjs"]);
+
 const standalone = path.join(process.cwd(), ".next", "standalone", "server.js");
 if (fs.existsSync(standalone)) {
   console.log("→ next standalone");

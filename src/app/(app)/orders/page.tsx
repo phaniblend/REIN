@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { money, num } from "@/lib/utils";
 
 type MenuItem = {
   id: string;
   name: string;
+  sellingPrice: string;
   isActive: boolean;
   menuApprovalStatus?: string;
   recipeApprovalStatus?: string;
@@ -166,7 +168,12 @@ export default function OrdersPage() {
                   key={item.id}
                   className="flex items-center justify-between gap-2 text-sm"
                 >
-                  <span>{item.name}</span>
+                  <span className="min-w-0">
+                    {item.name}
+                    <span className="ml-1 text-[var(--muted)]">
+                      {money(num(item.sellingPrice))}
+                    </span>
+                  </span>
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"

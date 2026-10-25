@@ -63,6 +63,7 @@ export default function RecipesPage() {
   const [newQty, setNewQty] = useState("");
   const [newUnit, setNewUnit] = useState("G");
   const [pickedId, setPickedId] = useState("");
+  const [lineError, setLineError] = useState<string | null>(null);
   const [repaired, setRepaired] = useState(false);
 
   const me = useQuery({
@@ -231,19 +232,20 @@ export default function RecipesPage() {
     setNewName("");
     setNewQty("");
     setPickedId("");
+    setLineError(null);
   }
 
   function addLine() {
     const qty = Number(newQty);
     if (!(qty > 0)) {
-      setMessage("Enter a quantity before adding that grocery item.");
+      setLineError("Enter a quantity before adding that line.");
       return;
     }
     if (pickedId) {
       const ing = ingredients.data?.ingredients.find((i) => i.id === pickedId);
       if (!ing) return;
       if (lines.some((l) => l.ingredientId === ing.id)) {
-        setMessage("That grocery item is already on this recipe.");
+        setLineError("That grocery item is already on this recipe.");
         return;
       }
       setLines((prev) => [
@@ -258,11 +260,11 @@ export default function RecipesPage() {
       ]);
       setPickedId("");
       setNewQty("");
-      setMessage(null);
+      setLineError(null);
       return;
     }
     if (!newName.trim()) {
-      setMessage("Pick a stock item or type a new grocery name.");
+      setLineError("Pick a stock item or type a new grocery name.");
       return;
     }
     setLines((prev) => [
@@ -277,7 +279,7 @@ export default function RecipesPage() {
     ]);
     setNewName("");
     setNewQty("");
-    setMessage(null);
+    setLineError(null);
   }
 
   return (
@@ -489,6 +491,9 @@ export default function RecipesPage() {
                         >
                           Add line
                         </Button>
+                        {lineError && (
+                          <p className="text-sm text-[var(--danger)]">{lineError}</p>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap gap-2">

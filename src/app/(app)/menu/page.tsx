@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -590,36 +591,38 @@ export default function MenuPage() {
         )}
       </div>
 
-      {pendingRemove && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <Card className="w-full max-w-sm space-y-3">
-            <CardTitle>Remove dish?</CardTitle>
-            <p className="text-sm text-[var(--muted)]">
-              Remove “{pendingRemove.name}” from the menu?
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setPendingRemove(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                disabled={removeItem.isPending}
-                onClick={() => {
-                  const id = pendingRemove.id;
-                  setPendingRemove(null);
-                  removeItem.mutate(id);
-                }}
-              >
-                Remove
-              </Button>
-            </div>
-          </Card>
-        </div>
-      )}
+      {pendingRemove &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <Card className="w-full max-w-sm space-y-3">
+              <CardTitle>Remove dish?</CardTitle>
+              <p className="text-sm text-[var(--muted)]">
+                Remove “{pendingRemove.name}” from the menu?
+              </p>
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setPendingRemove(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  disabled={removeItem.isPending}
+                  onClick={() => {
+                    const id = pendingRemove.id;
+                    setPendingRemove(null);
+                    removeItem.mutate(id);
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            </Card>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
