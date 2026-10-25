@@ -21,6 +21,38 @@ const schema = z.object({
   isWasted: z.boolean().optional(),
 });
 
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const session = await getSession();
+  if (!session) return jsonError("Unauthorized", 401);
+  const { id } = await context.params;
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.id, id), eq(orders.restaurantId, session.restaurantId)))
+    .limit(1);
+  if (!order) return jsonError("Order not found", 404);
+  return jsonOk({ order });
+}
+
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const session = await getSession();
+  if (!session) return jsonError("Unauthorized", 401);
+  const { id } = await context.params;
+  const [order] = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.id, id), eq(orders.restaurantId, session.restaurantId)))
+    .limit(1);
+  if (!order) return jsonError("Order not found", 404);
+  return jsonError("Tickets stay on the list. Mark them served instead.", 403);
+}
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },

@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { homePathForRole } from "@/lib/roles";
 import { money, num } from "@/lib/utils";
+import { showLaunchExtras } from "@/lib/launch";
 import { DataAlert, MiniBarChart, StatTile } from "@/components/ui/data-viz";
 
 type Ingredient = {
@@ -169,6 +170,8 @@ export default function DashboardPage() {
                 .map((alert) => alert.type.replaceAll("_", " "))
                 .join(", ")}
         </p>
+        {showLaunchExtras() && (
+          <>
         <button
           type="button"
           className="text-sm font-medium text-[var(--accent)]"
@@ -195,6 +198,8 @@ export default function DashboardPage() {
         >
           Send today&apos;s digest
         </button>
+          </>
+        )}
       </Card>
 
       <DataAlert
@@ -246,6 +251,13 @@ export default function DashboardPage() {
           className="rounded-2xl bg-[var(--tan)] px-4 py-3 text-sm font-medium"
         >
           Area cuisine grocery vs sales →
+        </Link>
+        <Link
+          href="/account"
+          prefetch={false}
+          className="rounded-2xl border border-[var(--border)] px-4 py-3 text-sm font-medium"
+        >
+          Export or delete this restaurant →
         </Link>
       </div>
     </div>

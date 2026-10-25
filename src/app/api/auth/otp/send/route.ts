@@ -16,6 +16,7 @@ const bodySchema = z.object({
   country: z.string().min(2).optional(),
   currency: z.string().min(3).max(3).optional(),
   ownerName: z.string().min(2).optional(),
+  acceptedTerms: z.boolean().optional(),
   email: z.string().email().optional(),
 });
 
@@ -66,6 +67,9 @@ export async function POST(request: Request) {
     if (existingPhone) {
       return jsonError("That mobile is already registered — sign in instead", 409);
     }
+    if (!body.acceptedTerms) {
+      return jsonError("Accept the terms and privacy policy to register");
+    }
 
     if (body.email) {
       const [existingEmail] = await db
@@ -88,6 +92,7 @@ export async function POST(request: Request) {
         currency: body.currency ?? "USD",
         ownerName: body.ownerName,
         email: body.email?.toLowerCase() ?? null,
+        termsAccepted: true,
       },
     });
     if (!sent.ok) return jsonError(sent.error, sent.status);

@@ -29,6 +29,9 @@ run("node", ["scripts/cleanup-test-data.cjs"]);
 console.log("→ clear hidden recipe defaults");
 run("node", ["scripts/clear-hidden-defaults.cjs"]);
 
+console.log("→ ensure flagged test kitchens");
+run("node", ["scripts/ensure-test-kitchens.cjs"]);
+
 const standalone = path.join(process.cwd(), ".next", "standalone", "server.js");
 if (fs.existsSync(standalone)) {
   console.log("→ next standalone");

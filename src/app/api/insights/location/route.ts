@@ -12,7 +12,7 @@ async function peerCount(cuisine: string, city: string) {
     .select({ id: restaurants.id })
     .from(restaurants)
     .where(
-      sql`lower(${restaurants.cuisineType}) = ${cuisine.toLowerCase()} and lower(${restaurants.city}) = ${city.toLowerCase()}`,
+      sql`lower(${restaurants.cuisineType}) = ${cuisine.toLowerCase()} and lower(${restaurants.city}) = ${city.toLowerCase()} and ${restaurants.isTest} = false`,
     );
   return rows;
 }

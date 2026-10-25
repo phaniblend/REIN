@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -82,18 +82,30 @@ export default function OrdersPage() {
     [selected],
   );
 
+  const requestId = useRef<string | null>(null);
+
   const create = useMutation({
     mutationFn: async () => {
+      if (!requestId.current) requestId.current = crypto.randomUUID();
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tableNumber, items }),
+        body: JSON.stringify({
+          tableNumber,
+          items,
+          clientRequestId: requestId.current,
+        }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.error ?? "Couldn't reach the kitchen. Tap send again — it won't create a second ticket.",
+        );
+      }
       return data;
     },
     onSuccess: () => {
+      requestId.current = null;
       setSelected({});
       qc.invalidateQueries({ queryKey: ["orders"] });
     },

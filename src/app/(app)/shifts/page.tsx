@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -35,6 +35,7 @@ export default function ShiftsPage() {
     alerts: AvtRow[];
     thresholdPercent: number;
     posCoverage?: { percent: number | null };
+    alreadyClosed?: boolean;
   } | null>(null);
 
   const list = useQuery({
@@ -56,25 +57,36 @@ export default function ShiftsPage() {
     return out;
   }, [counts]);
 
+  const requestId = useRef<string | null>(null);
+
   const reconcile = useMutation({
     mutationFn: async () => {
+      if (!requestId.current) requestId.current = crypto.randomUUID();
       const res = await fetch("/api/shifts/reconcile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           counts: payload,
           commitStock: true,
+          clientRequestId: requestId.current,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Reconcile failed");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          data.error ?? "The count didn't finish. Tap close again — it won't apply twice.",
+        );
+      }
       return data as {
         results: AvtRow[];
         alerts: AvtRow[];
         thresholdPercent: number;
+        alreadyClosed?: boolean;
+        posCoverage?: { percent: number | null };
       };
     },
     onSuccess: (data) => {
+      requestId.current = null;
       setResult(data);
       qc.invalidateQueries({ queryKey: ["ingredients"] });
     },
@@ -141,6 +153,11 @@ export default function ShiftsPage() {
             <CardTitle>AvT results</CardTitle>
             <Badge>Threshold {result.thresholdPercent}%</Badge>
           </div>
+          {result.alreadyClosed && (
+            <p className="text-sm text-[var(--muted)]">
+              This count was already closed, so nothing was counted twice.
+            </p>
+          )}
           {result.posCoverage?.percent != null && (
             <p className="text-sm text-[var(--muted)]">
               {result.posCoverage.percent.toFixed(0)}% of register sales in this

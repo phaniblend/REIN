@@ -143,9 +143,12 @@ export async function acceptStaffInvite(opts: {
   const invite = await getInviteByToken(opts.token);
   if (!invite) return { ok: false, error: "Invite not found", status: 404 };
 
-  // Already joined — resume that staff account (same invite link = permanent access).
   if (invite.acceptedAt) {
-    return resumeAcceptedInvite(invite);
+    return {
+      ok: false as const,
+      error: "This invite was already used. Sign in with your mobile number.",
+      status: 410,
+    };
   }
 
   if (new Date(invite.expiresAt).getTime() < Date.now()) {
@@ -200,48 +203,13 @@ export async function acceptStaffInvite(opts: {
   return { ok: true, user, role: invite.role as UserRole };
 }
 
-async function resumeAcceptedInvite(invite: typeof staffInvites.$inferSelect) {
-  let user: typeof users.$inferSelect | undefined;
-
-  if (invite.acceptedUserId) {
-    const [byId] = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, invite.acceptedUserId))
-      .limit(1);
-    user = byId;
-  }
-
-  if (!user) {
-    const [byPhone] = await db
-      .select()
-      .from(users)
-      .where(eq(users.phone, invite.phone))
-      .limit(1);
-    user = byPhone;
-  }
-
-  if (!user || user.restaurantId !== invite.restaurantId) {
-    return {
-      ok: false as const,
-      error: "This invite is no longer valid — ask your owner for a new one",
-      status: 410,
-    };
-  }
-
-  return { ok: true as const, user, role: user.role as UserRole };
-}
-
 /** Open an already-accepted invite and sign that staff member back in. */
 export async function continueStaffInvite(token: string) {
   const invite = await getInviteByToken(token);
   if (!invite) return { ok: false as const, error: "Invite not found", status: 404 };
-  if (!invite.acceptedAt) {
-    return {
-      ok: false as const,
-      error: "Invite not accepted yet — join first",
-      status: 400,
-    };
-  }
-  return resumeAcceptedInvite(invite);
+  return {
+    ok: false as const,
+    error: "This invite was already used. Sign in with your mobile number.",
+    status: 410,
+  };
 }

@@ -10,6 +10,11 @@ import {
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { findTestLogin } from "@/lib/test-login-accounts";
 import { ensureTestLogins } from "@/lib/test-logins";
+import {
+  assertLoginAllowed,
+  clearLoginFailures,
+  recordLoginFailure,
+} from "@/lib/login-guard";
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -19,21 +24,28 @@ const bodySchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = bodySchema.parse(await readJson(request));
-    if (
-      process.env.NODE_ENV !== "production" &&
-      findTestLogin(body.email)
-    ) {
+    const email = body.email.toLowerCase();
+    if (findTestLogin(email)) {
       await ensureTestLogins();
     }
+    const gate = await assertLoginAllowed(email);
+    if (!gate.ok) return jsonError(gate.error, gate.status);
     const [user] = await db
       .select()
       .from(users)
-      .where(eq(users.email, body.email.toLowerCase()))
+      .where(eq(users.email, email))
       .limit(1);
 
-    if (!user?.passwordHash) return jsonError("Invalid credentials", 401);
+    if (!user?.passwordHash) {
+      await recordLoginFailure(email);
+      return jsonError("Invalid credentials", 401);
+    }
     const ok = await verifyPassword(body.password, user.passwordHash);
-    if (!ok) return jsonError("Invalid credentials", 401);
+    if (!ok) {
+      await recordLoginFailure(email);
+      return jsonError("Invalid credentials", 401);
+    }
+    await clearLoginFailures(email);
 
     const token = await createSessionToken({
       id: user.id,

@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   ingredients,
@@ -43,6 +43,8 @@ export async function computeAvT(params: {
   /** Opening stock snapshot at shift start; defaults to currentStock + actualUsage approx via counts */
   openingStocks?: Record<string, number>;
   since?: Date;
+  /** Inclusive end of this close. Later tickets belong to the next count. */
+  until?: Date;
   thresholdPercent: number;
   /** On-hand at the location being counted. Falls back to restaurant stock. */
   onHand?: Record<string, number>;
@@ -51,6 +53,7 @@ export async function computeAvT(params: {
   includeLegacy?: boolean;
 }): Promise<IngredientAvT[]> {
   const since = params.since ?? new Date(Date.now() - 1000 * 60 * 60 * 16);
+  const until = params.until ?? new Date();
 
   const stockRows = await db
     .select()
@@ -63,6 +66,7 @@ export async function computeAvT(params: {
   const receiptWhere = [
     eq(stockReceipts.restaurantId, params.restaurantId),
     gt(stockReceipts.receivedAt, since),
+    lte(stockReceipts.receivedAt, until),
     inArray(stockReceipts.ingredientId, ingredientIds),
   ];
   if (params.locationId) {
@@ -87,6 +91,7 @@ export async function computeAvT(params: {
   const wasteWhere = [
     eq(wastageLogs.restaurantId, params.restaurantId),
     gt(wastageLogs.createdAt, since),
+    lte(wastageLogs.createdAt, until),
     inArray(wastageLogs.ingredientId, ingredientIds),
   ];
   if (params.locationId) {
@@ -125,6 +130,7 @@ export async function computeAvT(params: {
         eq(orders.restaurantId, params.restaurantId),
         eq(orders.source, "restman"),
         gt(orders.createdAt, since),
+        lte(orders.createdAt, until),
         inArray(orderItems.status, ["SERVED", "PREPARING", "RETURNED"]),
         inArray(recipeBoms.ingredientId, ingredientIds),
       ),
@@ -137,7 +143,7 @@ export async function computeAvT(params: {
   const theoreticalMap: Record<string, number> = Object.fromEntries(
     soldBom.map((r) => [r.ingredientId, num(r.theoretical)]),
   );
-  const posUsage = await theoreticalFromPos(params.restaurantId, since);
+  const posUsage = await theoreticalFromPos(params.restaurantId, since, until);
   for (const [ingredientId, qty] of Object.entries(posUsage)) {
     if (!ingredientIds.includes(ingredientId)) continue;
     theoreticalMap[ingredientId] = (theoreticalMap[ingredientId] ?? 0) + qty;

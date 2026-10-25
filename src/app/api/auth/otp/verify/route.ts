@@ -22,6 +22,7 @@ type RegisterPayload = {
   currency: string;
   ownerName: string;
   email: string | null;
+  termsAccepted?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
         region: payload.region,
         country: payload.country,
         currency: payload.currency,
+        termsAcceptedAt: payload.termsAccepted ? new Date() : null,
       })
       .returning();
 

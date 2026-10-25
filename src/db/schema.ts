@@ -87,6 +87,8 @@ export const restaurants = pgTable("restaurants", {
     precision: 5,
     scale: 2,
   }).default("5.00"),
+  isTest: boolean("is_test").default(false).notNull(),
+  termsAcceptedAt: timestamp("terms_accepted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -127,6 +129,41 @@ export const otpChallenges = pgTable(
   },
   (t) => [index("otp_phone_idx").on(t.phone)],
 );
+
+/** Failed sign-in attempts, locked after repeated misses. */
+export const authAttempts = pgTable("auth_attempts", {
+  key: text("key").primaryKey(),
+  failures: numeric("failures", { precision: 4, scale: 0 }).default("0").notNull(),
+  lockedUntil: timestamp("locked_until"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/** One close or ticket send, so a retry on bad Wi-Fi does not run twice. */
+export const requestKeys = pgTable(
+  "request_keys",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    key: text("key").notNull(),
+    kind: text("kind").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("request_keys_uidx").on(t.restaurantId, t.key)],
+);
+
+export const supportMessages = pgTable("support_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  restaurantId: uuid("restaurant_id")
+    .references(() => restaurants.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 /** Owner-issued staff join links — no staff self-registration */
 export const staffInvites = pgTable(
@@ -263,9 +300,13 @@ export const orders = pgTable(
     tableNumber: text("table_number").notNull(),
     status: orderStatusEnum("status").default("PENDING").notNull(),
     source: orderSourceEnum("source").default("restman").notNull(),
+    clientRequestId: text("client_request_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (t) => [index("orders_restaurant_idx").on(t.restaurantId)],
+  (t) => [
+    index("orders_restaurant_idx").on(t.restaurantId),
+    uniqueIndex("orders_client_request_uidx").on(t.restaurantId, t.clientRequestId),
+  ],
 );
 
 export const orderItems = pgTable("order_items", {

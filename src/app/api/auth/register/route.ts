@@ -19,6 +19,7 @@ const bodySchema = z.object({
   ownerName: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
+  acceptedTerms: z.literal(true),
 });
 
 export async function POST(request: Request) {
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
         region: body.region,
         country: body.country,
         currency: body.currency,
+        termsAcceptedAt: new Date(),
       })
       .returning();
 

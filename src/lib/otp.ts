@@ -28,6 +28,17 @@ export async function createAndSendOtp(opts: {
   const last = recent[0];
   if (
     last &&
+    Number(last.attempts ?? 0) >= 5 &&
+    Date.now() - new Date(last.createdAt).getTime() < 15 * 60 * 1000
+  ) {
+    return {
+      ok: false as const,
+      error: "Too many attempts. Try again in 15 minutes.",
+      status: 429,
+    };
+  }
+  if (
+    last &&
     Date.now() - new Date(last.createdAt).getTime() < RESEND_COOLDOWN_MS
   ) {
     return {

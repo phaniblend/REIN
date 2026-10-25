@@ -30,14 +30,7 @@ export async function GET(_request: Request, ctx: Ctx) {
       .limit(1);
 
     if (invite.acceptedAt) {
-      return jsonOk({
-        status: "accepted" as const,
-        phone: invite.phone,
-        name: invite.name,
-        role: invite.role,
-        restaurantName: restaurant?.name ?? "Restaurant",
-        canContinue: true,
-      });
+      return jsonError("This invite was already used. Sign in with your mobile number.", 410);
     }
 
     if (new Date(invite.expiresAt).getTime() < Date.now()) {

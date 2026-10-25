@@ -63,7 +63,24 @@ async function writeRestaurantTotal(ingredientId: string) {
   return total;
 }
 
+async function assertBinPair(locationId: string, ingredientId: string) {
+  const [location] = await db
+    .select({ restaurantId: locations.restaurantId })
+    .from(locations)
+    .where(eq(locations.id, locationId))
+    .limit(1);
+  const [item] = await db
+    .select({ restaurantId: ingredients.restaurantId })
+    .from(ingredients)
+    .where(eq(ingredients.id, ingredientId))
+    .limit(1);
+  if (!location || !item || location.restaurantId !== item.restaurantId) {
+    throw new Error("That stock item is not at this restaurant");
+  }
+}
+
 export async function bumpBin(locationId: string, ingredientId: string, delta: number) {
+  await assertBinPair(locationId, ingredientId);
   const [ing] = await db
     .select()
     .from(ingredients)
@@ -106,6 +123,7 @@ export async function bumpBin(locationId: string, ingredientId: string, delta: n
 }
 
 export async function setBin(locationId: string, ingredientId: string, qty: number) {
+  await assertBinPair(locationId, ingredientId);
   const next = Math.max(0, qty);
   const [bin] = await db
     .select()

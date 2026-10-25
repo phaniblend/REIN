@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { locations } from "@/db/schema";
+import { locations, restaurants } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
 import { syncStaleConnections } from "@/lib/connectors";
@@ -16,7 +16,13 @@ export async function POST(request: Request) {
 
   const restaurantIds = session
     ? [session.restaurantId]
-    : (await db.select({ id: locations.restaurantId }).from(locations)).map((row) => row.id);
+    : (
+        await db
+          .select({ id: locations.restaurantId })
+          .from(locations)
+          .innerJoin(restaurants, eq(restaurants.id, locations.restaurantId))
+          .where(eq(restaurants.isTest, false))
+      ).map((row) => row.id);
   const unique = [...new Set(restaurantIds)];
   for (const restaurantId of unique) {
     await syncStaleConnections(restaurantId);
@@ -27,7 +33,12 @@ export async function POST(request: Request) {
       .limit(1);
     if (!location) continue;
     if (hourInTimezone(location.timezone) === Number(location.closeHour)) {
-      await deliverDigest(restaurantId);
+      const [restaurant] = await db
+        .select({ isTest: restaurants.isTest })
+        .from(restaurants)
+        .where(eq(restaurants.id, restaurantId))
+        .limit(1);
+      if (!restaurant?.isTest) await deliverDigest(restaurantId);
     }
   }
   return jsonOk({ restaurants: unique.length });

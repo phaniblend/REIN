@@ -98,3 +98,7 @@ body {
   border-radius: 999px;
   background: var(--chart-cap);
 }
+
+body {
+  overflow-x: clip;
+}

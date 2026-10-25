@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RestmanLogo } from "@/components/restman-logo";
 import type { UserRole } from "@/lib/roles";
+import { LAUNCH_EXTRA_HREFS, showLaunchExtras } from "@/lib/launch";
 
 type NavLink = {
   href: string;
@@ -124,7 +125,11 @@ export function AppShell({
     return () => cancelAnimationFrame(frame);
   }, [pathname, role]);
 
-  const links = allLinks.filter((l) => !l.roles || l.roles.includes(role));
+  const links = allLinks.filter((l) => {
+    if (l.roles && !l.roles.includes(role)) return false;
+    if (!showLaunchExtras() && LAUNCH_EXTRA_HREFS.includes(l.href)) return false;
+    return true;
+  });
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -133,7 +138,7 @@ export function AppShell({
   }
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-lg flex-col pb-24">
+    <div className="mx-auto flex min-h-full w-full max-w-lg flex-col overflow-x-clip pb-24">
       <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--bg)_88%,transparent)] px-4 py-3 backdrop-blur-md">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
@@ -142,6 +147,9 @@ export function AppShell({
               {restaurantName} · {userName}
               <span className="ml-1 opacity-70">· {role.toLowerCase()}</span>
             </p>
+            <a href="/support" className="text-xs font-medium text-[var(--accent)]">
+              Report a problem
+            </a>
           </div>
           <Button variant="ghost" size="icon" onClick={logout} aria-label="Log out">
             <LogOut className="h-4 w-4" />
@@ -164,7 +172,7 @@ export function AppShell({
                 href={href}
                 data-active={active ? "true" : "false"}
                 className={cn(
-                  "flex min-w-14 shrink-0 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px]",
+                  "flex min-h-12 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 text-[10px]",
                   active
                     ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                     : "text-[var(--muted)]",

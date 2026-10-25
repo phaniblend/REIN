@@ -1,4 +1,4 @@
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, lte } from "drizzle-orm";
 import { db } from "@/db";
 import {
   ingredients,
@@ -226,7 +226,11 @@ export async function autoMapConnection(
   return linked;
 }
 
-export async function theoreticalFromPos(restaurantId: string, since: Date) {
+export async function theoreticalFromPos(
+  restaurantId: string,
+  since: Date,
+  until = new Date(),
+) {
   const sales = await db
     .select({
       qty: posSaleLines.qty,
@@ -241,6 +245,7 @@ export async function theoreticalFromPos(restaurantId: string, since: Date) {
       and(
         eq(integrationConnections.restaurantId, restaurantId),
         gt(posSaleLines.soldAt, since),
+        lte(posSaleLines.soldAt, until),
       ),
     );
   const usage: Record<string, number> = {};

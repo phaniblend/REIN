@@ -7,6 +7,7 @@ import { jsonError, jsonOk, readJson } from "@/lib/api";
 
 const createSchema = z.object({
   tableNumber: z.string().min(1),
+  clientRequestId: z.string().min(8).max(80).optional(),
   items: z
     .array(
       z.object({
@@ -74,6 +75,33 @@ export async function POST(request: Request) {
 
   try {
     const body = createSchema.parse(await readJson(request));
+    if (body.clientRequestId) {
+      const [existing] = await db
+        .select()
+        .from(orders)
+        .where(
+          and(
+            eq(orders.restaurantId, session.restaurantId),
+            eq(orders.clientRequestId, body.clientRequestId),
+          ),
+        )
+        .limit(1);
+      if (existing) return jsonOk({ order: existing, replayed: true });
+    }
+
+    const menuIds = [...new Set(body.items.map((item) => item.menuItemId))];
+    const owned = await db
+      .select({ id: menuItems.id })
+      .from(menuItems)
+      .where(
+        and(
+          eq(menuItems.restaurantId, session.restaurantId),
+          inArray(menuItems.id, menuIds),
+        ),
+      );
+    if (owned.length !== menuIds.length) {
+      return jsonError("Menu item not found", 404);
+    }
 
     const [order] = await db
       .insert(orders)
@@ -82,6 +110,7 @@ export async function POST(request: Request) {
         waiterId: session.id,
         tableNumber: body.tableNumber,
         status: "PENDING",
+        clientRequestId: body.clientRequestId,
       })
       .returning();
 

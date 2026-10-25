@@ -22,6 +22,18 @@ async function getOwnedItem(id: string, restaurantId: string) {
   return item ?? null;
 }
 
+export async function GET(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const session = await getSession();
+  if (!session) return jsonError("Unauthorized", 401);
+  const { id } = await context.params;
+  const existing = await getOwnedItem(id, session.restaurantId);
+  if (!existing) return jsonError("Menu item not found", 404);
+  return jsonOk({ menuItem: existing });
+}
+
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },

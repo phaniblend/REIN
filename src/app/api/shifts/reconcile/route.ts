@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { db } from "@/db";
-import { locations, restaurants, shiftCounts } from "@/db/schema";
+import { locations, requestKeys, restaurants, shiftCounts } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { computeAvT } from "@/lib/avt";
@@ -16,6 +16,7 @@ const schema = z.object({
   openingStocks: z.record(z.string().uuid(), z.number().nonnegative()).optional(),
   sinceHours: z.number().positive().default(16),
   commitStock: z.boolean().default(true),
+  clientRequestId: z.string().min(8).max(80).optional(),
 });
 
 export async function POST(request: Request) {
@@ -25,8 +26,10 @@ export async function POST(request: Request) {
     return jsonError("Forbidden", 403);
   }
 
+  let requestKey: string | undefined;
   try {
     const body = schema.parse(await readJson(request));
+    requestKey = body.clientRequestId;
     const [restaurant] = await db
       .select()
       .from(restaurants)
@@ -41,7 +44,28 @@ export async function POST(request: Request) {
       })
       .from(shiftCounts)
       .where(eq(shiftCounts.restaurantId, session.restaurantId));
-    const since = countWindowStart(lastClose?.closedAt, Date.now(), body.sinceHours);
+    const until = new Date();
+    const since = countWindowStart(lastClose?.closedAt, until.getTime(), body.sinceHours);
+    if (body.clientRequestId) {
+      const [savedKey] = await db
+        .insert(requestKeys)
+        .values({
+          restaurantId: session.restaurantId,
+          key: body.clientRequestId,
+          kind: "count",
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (!savedKey) {
+        return jsonOk({
+          alreadyClosed: true,
+          thresholdPercent: threshold,
+          results: [],
+          alerts: [],
+          savedCount: 0,
+        });
+      }
+    }
     const location = await ensureLocationBins(session.restaurantId);
     const [first] = await db
       .select()
@@ -56,6 +80,7 @@ export async function POST(request: Request) {
       physicalCounts: body.counts,
       openingStocks: body.openingStocks,
       since,
+      until,
       thresholdPercent: threshold,
       onHand,
       locationId: location.id,
@@ -80,6 +105,7 @@ export async function POST(request: Request) {
           ).toFixed(3),
           variance: row.totalVariance.toFixed(3),
           unaccountedCost: row.unaccountedCost.toFixed(2),
+          createdAt: until,
         })
         .returning();
       saved.push(savedRow);
@@ -101,6 +127,16 @@ export async function POST(request: Request) {
       posCoverage: coverage,
     });
   } catch (err) {
+    if (requestKey) {
+      await db
+        .delete(requestKeys)
+        .where(
+          and(
+            eq(requestKeys.restaurantId, session.restaurantId),
+            eq(requestKeys.key, requestKey),
+          ),
+        );
+    }
     if (err instanceof z.ZodError) {
       return jsonError(err.issues[0]?.message ?? "Invalid input");
     }

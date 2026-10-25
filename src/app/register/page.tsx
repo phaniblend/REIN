@@ -30,6 +30,7 @@ export default function RegisterPage() {
   const [devCode, setDevCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   function set<K extends keyof typeof form>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -54,6 +55,7 @@ export default function RegisterPage() {
         currency: form.currency,
         ownerName: form.ownerName,
         email: form.email || undefined,
+        acceptedTerms,
       }),
     });
     const data = await res.json();
@@ -186,8 +188,28 @@ export default function RegisterPage() {
                 onChange={(e) => set("email", e.target.value)}
               />
             </div>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                required
+              />
+              <span>
+                I agree to the{" "}
+                <Link href="/terms" className="underline">
+                  terms
+                </Link>{" "}
+                and{" "}
+                <Link href="/privacy" className="underline">
+                  privacy policy
+                </Link>
+                .
+              </span>
+            </label>
             {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || !acceptedTerms}>
               {loading ? "Sending code…" : "Text me a verification code"}
             </Button>
           </form>
