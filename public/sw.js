@@ -8,6 +8,6 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener("fetch", (event) => {
-  event.respondWith(fetch(event.request));
-});
+// Do not replay requests. A passthrough fetch() doubled Next.js RSC
+// prefetches, and those extra calls were the ones returning 503.
+self.addEventListener("fetch", () => {});

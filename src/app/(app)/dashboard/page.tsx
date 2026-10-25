@@ -146,18 +146,21 @@ export default function DashboardPage() {
       <div className="grid gap-2">
         <Link
           href="/shifts"
+          prefetch={false}
           className="rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-medium text-[var(--accent-fg)]"
         >
           Run blind closing count →
         </Link>
         <Link
           href="/menu"
+          prefetch={false}
           className="rounded-2xl border border-[var(--fg)] bg-[var(--surface)] px-4 py-3 text-sm font-medium"
         >
           Generate recommended menu →
         </Link>
         <Link
           href="/insights"
+          prefetch={false}
           className="rounded-2xl bg-[var(--tan)] px-4 py-3 text-sm font-medium"
         >
           Area cuisine grocery vs sales →

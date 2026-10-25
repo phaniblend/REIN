@@ -30,6 +30,20 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // Background RSC prefetches were bursting the app and coming back 503.
+  // A real click does not send this header, so navigation still renders.
+  const purpose = request.headers.get("sec-purpose") ?? request.headers.get("purpose") ?? "";
+  if (
+    request.headers.get("next-router-prefetch") ||
+    request.headers.get("next-router-segment-prefetch") ||
+    purpose.toLowerCase().includes("prefetch")
+  ) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  }
+
   const isPublic =
     publicPaths.includes(pathname) ||
     pathname.startsWith("/invite/") ||

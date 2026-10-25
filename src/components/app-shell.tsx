@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ClipboardList,
@@ -128,22 +127,35 @@ export function AppShell({
           )}
         >
           {links.map(({ href, label, icon: Icon }) => {
-            const active = pathname.startsWith(href);
+            const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
-              <Link
+              <a
                 key={`${href}-${label}`}
                 href={href}
-                prefetch={false}
                 className={cn(
                   "flex flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px]",
                   active
                     ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                     : "text-[var(--muted)]",
                 )}
+                onClick={(event) => {
+                  if (
+                    event.defaultPrevented ||
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  ) {
+                    return;
+                  }
+                  event.preventDefault();
+                  if (!active) router.push(href);
+                }}
               >
                 <Icon className="h-4 w-4" />
                 {label}
-              </Link>
+              </a>
             );
           })}
         </div>
