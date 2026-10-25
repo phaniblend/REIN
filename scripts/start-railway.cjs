@@ -23,6 +23,9 @@ run("npx", ["drizzle-kit", "push", "--force"]);
 console.log("→ dedupe duplicate dishes and ingredients");
 run("node", ["scripts/dedupe-catalog.cjs"]);
 
+console.log("→ remove leftover live test data");
+run("node", ["scripts/cleanup-test-data.cjs"]);
+
 const standalone = path.join(process.cwd(), ".next", "standalone", "server.js");
 if (fs.existsSync(standalone)) {
   console.log("→ next standalone");

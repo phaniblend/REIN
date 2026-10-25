@@ -306,6 +306,12 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+/** One-shot deploy tasks. Kept in schema so drizzle push does not drop the marker. */
+export const maintenanceFlags = pgTable("maintenance_flags", {
+  key: text("key").primaryKey(),
+  doneAt: timestamp("done_at").defaultNow().notNull(),
+});
+
 export const restaurantsRelations = relations(restaurants, ({ many }) => ({
   users: many(users),
   ingredients: many(ingredients),
