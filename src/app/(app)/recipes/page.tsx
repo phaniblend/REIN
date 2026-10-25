@@ -10,6 +10,25 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { money, num } from "@/lib/utils";
 
+const CATEGORY_ORDER = [
+  "Appetizers",
+  "Soups & Salads",
+  "Main Course — Veg",
+  "Main Course — Non-Veg",
+  "Main Course",
+  "Breads & Rice",
+  "Sides",
+  "Desserts",
+  "Beverages",
+];
+
+function categoryRank(category: string) {
+  const index = CATEGORY_ORDER.findIndex(
+    (name) => name.toLowerCase() === category.toLowerCase(),
+  );
+  return index === -1 ? CATEGORY_ORDER.length : index;
+}
+
 type RecipeLine = {
   ingredientId: string;
   grossQuantity: string;
@@ -85,9 +104,9 @@ export default function RecipesPage() {
     enabled: canSeeCost,
     queryFn: async () => {
       const res = await fetch("/api/menu/costs");
-      if (!res.ok) return { costs: [] as { dishId: string; foodCostPercent: number | null; overTarget: boolean }[] };
+      if (!res.ok) return { costs: [] as { dishId: string; foodCostPercent: number | null; overTarget: boolean; unpriced?: string[] }[] };
       return res.json() as Promise<{
-        costs: { dishId: string; foodCostPercent: number | null; overTarget: boolean }[];
+        costs: { dishId: string; foodCostPercent: number | null; overTarget: boolean; unpriced?: string[] }[];
       }>;
     },
   });
@@ -151,14 +170,14 @@ export default function RecipesPage() {
             ? {
                 ingredientId: l.ingredientId,
                 grossQuantity: Number(l.grossQuantity),
-                shrinkageMarginPercent: 5,
+                shrinkageMarginPercent: 0,
               }
             : {
                 name: l.name,
                 unit: l.unit as "KG" | "G" | "L" | "ML" | "PIECE" | "PACKET",
                 category: "General",
                 grossQuantity: Number(l.grossQuantity),
-                shrinkageMarginPercent: 5,
+                shrinkageMarginPercent: 0,
               },
         );
       if (!payloadLines.length) {
@@ -171,15 +190,18 @@ export default function RecipesPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to save recipe");
-      return data;
+      return data as { unpriced?: string[] };
     },
-    onSuccess: (_d, vars) => {
+    onSuccess: (data, vars) => {
       qc.invalidateQueries({ queryKey: ["menu"] });
       qc.invalidateQueries({ queryKey: ["ingredients"] });
+      qc.invalidateQueries({ queryKey: ["menu-costs"] });
       setMessage(
         vars.finalize
           ? "Dish recipe finalized."
-          : "Recipe saved — finalize when quantities look right.",
+          : data.unpriced?.length
+            ? `Draft saved. Set a cost for ${data.unpriced.join(", ")} on Stock before the food-cost percent means anything.`
+            : "Draft saved.",
       );
       if (vars.finalize) setOpenId(null);
     },
@@ -229,7 +251,7 @@ export default function RecipesPage() {
       list.push(item);
       map.set(key, list);
     }
-    return [...map.entries()];
+    return [...map.entries()].sort((a, b) => categoryRank(a[0]) - categoryRank(b[0]));
   }, [editableMenu]);
 
   function openDish(item: MenuItem) {
@@ -316,7 +338,7 @@ export default function RecipesPage() {
               : "The chef sets grocery quantities. This list is read-only."}
         </p>
         <p className="mt-1 text-xs text-[var(--muted)]">
-          {done.length} recipes done · {pending.length} awaiting chef
+          {done.length} {done.length === 1 ? "recipe" : "recipes"} done · {pending.length} awaiting chef
         </p>
       </div>
 
@@ -385,9 +407,11 @@ export default function RecipesPage() {
                           {(item.recipe?.length ?? 0) > 0
                             ? `${item.recipe.length} ingredient${item.recipe.length === 1 ? "" : "s"}`
                             : "No recipe yet"}
-                          {costByDish.get(item.id)?.foodCostPercent != null
-                            ? ` · ${costByDish.get(item.id)!.foodCostPercent!.toFixed(0)}% food cost`
-                            : ""}
+                          {costByDish.get(item.id)?.unpriced?.length
+                            ? ` · set a cost for ${costByDish.get(item.id)!.unpriced!.join(", ")}`
+                            : costByDish.get(item.id)?.foodCostPercent != null
+                              ? ` · ${costByDish.get(item.id)!.foodCostPercent!.toFixed(0)}% food cost`
+                              : ""}
                         </p>
                       </div>
                       <Badge>
@@ -409,9 +433,11 @@ export default function RecipesPage() {
                           {(item.recipe?.length ?? 0) > 0
                             ? `${item.recipe.length} ingredient${item.recipe.length === 1 ? "" : "s"}`
                             : "No recipe yet"}
-                          {costByDish.get(item.id)?.foodCostPercent != null
-                            ? ` · ${costByDish.get(item.id)!.foodCostPercent!.toFixed(0)}% food cost`
-                            : ""}
+                          {costByDish.get(item.id)?.unpriced?.length
+                            ? ` · set a cost for ${costByDish.get(item.id)!.unpriced!.join(", ")}`
+                            : costByDish.get(item.id)?.foodCostPercent != null
+                              ? ` · ${costByDish.get(item.id)!.foodCostPercent!.toFixed(0)}% food cost`
+                              : ""}
                         </p>
                       </div>
                       <Badge>{signed ? "Chef finalized" : "Awaiting chef"}</Badge>
@@ -542,6 +568,9 @@ export default function RecipesPage() {
                           {save.isPending ? "Saving…" : "Finalize dish"}
                         </Button>
                       </div>
+                      {message && (
+                        <p className="text-sm text-[var(--accent)]">{message}</p>
+                      )}
                     </div>
                   )}
                 </Card>

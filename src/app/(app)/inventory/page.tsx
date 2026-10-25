@@ -24,9 +24,9 @@ export default function InventoryPage() {
     name: "",
     category: "",
     unit: "KG",
-    costPerUnit: "0",
-    currentStock: "0",
-    parLevel: "0",
+    costPerUnit: "",
+    currentStock: "",
+    parLevel: "",
     allergens: "",
   });
   const [receipt, setReceipt] = useState({
@@ -68,9 +68,9 @@ export default function InventoryPage() {
         name: "",
         category: "",
         unit: "KG",
-        costPerUnit: "0",
-        currentStock: "0",
-        parLevel: "0",
+        costPerUnit: "",
+        currentStock: "",
+        parLevel: "",
         allergens: "",
       });
     },
@@ -149,6 +149,7 @@ export default function InventoryPage() {
               <Label>Cost / unit</Label>
               <Input
                 type="number"
+                placeholder="0"
                 value={form.costPerUnit}
                 onChange={(e) =>
                   setForm({ ...form, costPerUnit: e.target.value })
@@ -159,6 +160,7 @@ export default function InventoryPage() {
               <Label>Stock</Label>
               <Input
                 type="number"
+                placeholder="0"
                 value={form.currentStock}
                 onChange={(e) =>
                   setForm({ ...form, currentStock: e.target.value })
@@ -169,6 +171,7 @@ export default function InventoryPage() {
               <Label>Par</Label>
               <Input
                 type="number"
+                placeholder="0"
                 value={form.parLevel}
                 onChange={(e) => setForm({ ...form, parLevel: e.target.value })}
               />
@@ -250,7 +253,8 @@ export default function InventoryPage() {
               <p className="font-[family-name:var(--font-display)]">
                 {num(i.currentStock)} {i.unit}
               </p>
-              {num(i.parLevel) > 0 && num(i.currentStock) < num(i.parLevel) && (
+              {(num(i.currentStock) <= 0 ||
+                (num(i.parLevel) > 0 && num(i.currentStock) < num(i.parLevel))) && (
                 <Badge className="bg-[var(--accent-soft)] text-[var(--accent)]">
                   Below par
                 </Badge>

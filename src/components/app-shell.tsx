@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import {
   Building2,
   CalendarClock,
@@ -40,7 +41,7 @@ const allLinks: NavLink[] = [
   },
   {
     href: "/recipes",
-    label: "Home",
+    label: "Recipes",
     icon: LayoutDashboard,
     roles: ["CHEF"],
   },
@@ -54,7 +55,7 @@ const allLinks: NavLink[] = [
   },
   {
     href: "/purchasing",
-    label: "Orders",
+    label: "Buy",
     icon: ShoppingCart,
     roles: ["OWNER", "CHEF", "STOCK_CLERK"],
   },
@@ -105,17 +106,16 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const navRef = useRef<HTMLDivElement>(null);
 
-  const links = allLinks
-    .filter((l) => !l.roles || l.roles.includes(role))
-    // Chef gets Home → Recipes; don't also show a second Recipes tab.
-    .filter((l, _i, arr) => {
-      if (role !== "CHEF") return true;
-      if (l.label === "Recipes" && arr.some((x) => x.label === "Home" && x.href === "/recipes")) {
-        return false;
-      }
-      return true;
-    });
+  useEffect(() => {
+    const active = navRef.current?.querySelector<HTMLAnchorElement>(
+      "[data-active='true']",
+    );
+    active?.scrollIntoView({ inline: "center", block: "nearest" });
+  }, [pathname, role]);
+
+  const links = allLinks.filter((l) => !l.roles || l.roles.includes(role));
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -143,13 +143,17 @@ export function AppShell({
       <main className="flex-1 px-4 py-4">{children}</main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--border)] bg-[color-mix(in_oklab,var(--bg)_92%,transparent)] backdrop-blur-md">
-        <div className="mx-auto flex max-w-lg gap-0.5 overflow-x-auto px-1 py-1.5">
+        <div
+          ref={navRef}
+          className="mx-auto flex max-w-lg gap-0.5 overflow-x-auto px-1 py-1.5"
+        >
           {links.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <a
                 key={`${href}-${label}`}
                 href={href}
+                data-active={active ? "true" : "false"}
                 className={cn(
                   "flex min-w-14 shrink-0 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px]",
                   active

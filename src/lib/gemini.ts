@@ -16,7 +16,7 @@ export const menuRecipeSuggestionSchema = z.object({
             category: z.string(),
             unit: unitSchema,
             grossQuantity: z.number().positive(),
-            shrinkageMarginPercent: z.number().min(0).max(50).default(5),
+            shrinkageMarginPercent: z.number().min(0).max(50).default(0),
             estimatedCostPerUnit: z.number().positive().optional(),
           }),
         )

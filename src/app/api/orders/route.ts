@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { menuItems, orderItems, orders, recipeBoms } from "@/db/schema";
 import { getSession } from "@/lib/auth";
@@ -21,12 +21,27 @@ export async function GET() {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
 
-  const rows = await db
+  const recent = await db
     .select()
     .from(orders)
     .where(eq(orders.restaurantId, session.restaurantId))
     .orderBy(desc(orders.createdAt))
     .limit(40);
+  const open = await db
+    .select()
+    .from(orders)
+    .where(
+      and(
+        eq(orders.restaurantId, session.restaurantId),
+        inArray(orders.status, ["PENDING", "PREPARING"]),
+      ),
+    );
+  const seen = new Set<string>();
+  const rows = [...open, ...recent].filter((order) => {
+    if (seen.has(order.id)) return false;
+    seen.add(order.id);
+    return true;
+  });
 
   const withItems = await Promise.all(
     rows.map(async (order) => {

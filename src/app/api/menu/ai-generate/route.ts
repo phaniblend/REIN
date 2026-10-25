@@ -5,6 +5,7 @@ import { ingredients, menuItems, recipeBoms, restaurants } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { suggestMenuAndRecipes } from "@/lib/gemini";
+import { sameDish } from "@/lib/units";
 
 /** Dish-only Gemini calls — usually under a minute. */
 export const maxDuration = 120;
@@ -49,9 +50,7 @@ export async function POST(request: Request) {
         item.menuApprovalStatus !== "PENDING_APPROVAL" &&
         item.menuApprovalStatus !== "DRAFT",
     );
-    const existingNames = new Set(
-      keptMenu.map((item) => item.name.trim().toLowerCase()),
-    );
+    const keptNames = keptMenu.map((item) => item.name);
 
     const suggestion = await suggestMenuAndRecipes({
       cuisineType: restaurant.cuisineType,
@@ -88,12 +87,12 @@ export async function POST(request: Request) {
     let skipped = 0;
 
     for (const item of suggestion.items) {
-      const nameKey = item.name.trim().toLowerCase();
-      if (!nameKey || existingNames.has(nameKey)) {
+      const nameKey = item.name.trim();
+      if (!nameKey || keptNames.some((existing) => sameDish(existing, nameKey))) {
         skipped += 1;
         continue;
       }
-      existingNames.add(nameKey);
+      keptNames.push(nameKey);
       const bomLinks: {
         ingredientId: string;
         grossQuantity: string;
@@ -113,7 +112,7 @@ export async function POST(request: Request) {
               name: ing.name,
               category: ing.category,
               unit: ing.unit,
-              costPerUnit: (ing.estimatedCostPerUnit ?? 1).toFixed(2),
+              costPerUnit: (ing.estimatedCostPerUnit ?? 0).toFixed(2),
               currentStock: "0.000",
             })
             .returning();

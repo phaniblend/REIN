@@ -30,4 +30,20 @@ export function matchConfidence(a: string, b: string) {
   return hits / Math.max(rightTokens.length, leftTokens.size);
 }
 
+export function sameDish(a: string, b: string) {
+  const key = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const left = key(a);
+  const right = key(b);
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const shorter = left.length <= right.length ? left : right;
+  const longer = left.length <= right.length ? right : left;
+  return shorter.length >= 8 && longer.includes(shorter);
+}
+
 export const AUTO_MAP_CONFIDENCE = 0.9;

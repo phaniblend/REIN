@@ -27,7 +27,7 @@ type Order = {
 
 export default function OrdersPage() {
   const qc = useQueryClient();
-  const [tableNumber, setTableNumber] = useState("12");
+  const [tableNumber, setTableNumber] = useState("");
   const [selected, setSelected] = useState<Record<string, number>>({});
 
   const me = useQuery({
@@ -43,7 +43,8 @@ export default function OrdersPage() {
   const role = me.data?.user?.role;
   const isChef = role === "CHEF";
   const canSendOrder = role === "OWNER" || role === "WAITER";
-  const canChangeStatus = role === "OWNER" || role === "CHEF" || role === "WAITER";
+  const canPrep = role === "OWNER" || role === "CHEF";
+  const canServe = role === "OWNER" || role === "CHEF" || role === "WAITER";
 
   const menu = useQuery({
     queryKey: ["menu"],
@@ -223,52 +224,85 @@ export default function OrdersPage() {
         </Card>
       )}
 
-      <div className="space-y-2">
-        {(orders.data?.orders ?? []).map((order) => (
-          <Card key={order.id} className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="font-medium">Table {order.tableNumber}</p>
-              <Badge>{order.status}</Badge>
-            </div>
-            <ul className="text-sm text-[var(--muted)]">
-              {order.items.map((it, idx) => (
-                <li key={idx}>
-                  {it.quantity}× {it.menuItemName}
-                </li>
-              ))}
-            </ul>
-            {canChangeStatus && (
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={
-                    order.status === "SERVED" || updateStatus.isPending
-                  }
-                  onClick={() =>
-                    updateStatus.mutate({ id: order.id, status: "PREPARING" })
-                  }
-                >
-                  Prep
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={
-                    order.status === "SERVED" || updateStatus.isPending
-                  }
-                  onClick={() =>
-                    updateStatus.mutate({ id: order.id, status: "SERVED" })
-                  }
-                >
-                  Served
-                </Button>
-              </div>
-            )}
-          </Card>
-        ))}
-        {(orders.data?.orders ?? []).length === 0 && (
-          <p className="text-sm text-[var(--muted)]">No open tickets yet.</p>
-        )}
+      <div className="space-y-4">
+        <section className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+            Open
+          </p>
+          {(orders.data?.orders ?? []).filter(
+            (order) => order.status === "PENDING" || order.status === "PREPARING",
+          ).length === 0 && (
+            <p className="text-sm text-[var(--muted)]">No open tickets yet.</p>
+          )}
+          {(orders.data?.orders ?? [])
+            .filter(
+              (order) => order.status === "PENDING" || order.status === "PREPARING",
+            )
+            .map((order) => (
+              <Card key={order.id} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">Table {order.tableNumber}</p>
+                  <Badge>{order.status}</Badge>
+                </div>
+                <ul className="text-sm text-[var(--muted)]">
+                  {order.items.map((it, idx) => (
+                    <li key={idx}>
+                      {it.quantity}× {it.menuItemName}
+                    </li>
+                  ))}
+                </ul>
+                {canServe && (
+                  <div className="flex gap-2">
+                    {canPrep && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={updateStatus.isPending}
+                        onClick={() =>
+                          updateStatus.mutate({ id: order.id, status: "PREPARING" })
+                        }
+                      >
+                        Prep
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      disabled={updateStatus.isPending}
+                      onClick={() =>
+                        updateStatus.mutate({ id: order.id, status: "SERVED" })
+                      }
+                    >
+                      Served
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            ))}
+        </section>
+        <section className="space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+            Recent
+          </p>
+          {(orders.data?.orders ?? [])
+            .filter(
+              (order) => order.status !== "PENDING" && order.status !== "PREPARING",
+            )
+            .map((order) => (
+              <Card key={order.id} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium">Table {order.tableNumber}</p>
+                  <Badge>{order.status}</Badge>
+                </div>
+                <ul className="text-sm text-[var(--muted)]">
+                  {order.items.map((it, idx) => (
+                    <li key={idx}>
+                      {it.quantity}× {it.menuItemName}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            ))}
+        </section>
         {updateStatus.error && (
           <p className="text-sm text-[var(--danger)]">
             {(updateStatus.error as Error).message}

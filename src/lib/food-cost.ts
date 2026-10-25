@@ -8,6 +8,7 @@ export type DishCost = {
   foodCost: number;
   foodCostPercent: number | null;
   overTarget: boolean;
+  unpriced: string[];
 };
 
 const TARGET_PERCENT = 35;
@@ -22,6 +23,7 @@ export async function dishFoodCosts(restaurantId: string): Promise<DishCost[]> {
     .from(ingredients)
     .where(eq(ingredients.restaurantId, restaurantId));
   const costById = new Map(stock.map((row) => [row.id, num(row.costPerUnit)]));
+  const nameById = new Map(stock.map((row) => [row.id, row.name]));
   const boms = await db.select().from(recipeBoms);
   const byDish = new Map<string, typeof boms>();
   for (const line of boms) {
@@ -32,6 +34,18 @@ export async function dishFoodCosts(restaurantId: string): Promise<DishCost[]> {
 
   return dishes.map((dish) => {
     const lines = byDish.get(dish.id) ?? [];
+    const unpriced = lines
+      .filter((line) => (costById.get(line.ingredientId) ?? 0) <= 0)
+      .map((line) => nameById.get(line.ingredientId) ?? "an item");
+    if (!lines.length || unpriced.length) {
+      return {
+        dishId: dish.id,
+        foodCost: 0,
+        foodCostPercent: null,
+        overTarget: false,
+        unpriced,
+      };
+    }
     let foodCost = 0;
     for (const line of lines) {
       const yieldPct = Math.max(num(line.yieldPercent), 1);
@@ -46,6 +60,7 @@ export async function dishFoodCosts(restaurantId: string): Promise<DishCost[]> {
       foodCost,
       foodCostPercent,
       overTarget: foodCostPercent !== null && foodCostPercent > TARGET_PERCENT,
+      unpriced: [],
     };
   });
 }

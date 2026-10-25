@@ -11,8 +11,8 @@ const lineSchema = z.object({
   category: z.string().min(1).optional(),
   unit: z.enum(["KG", "G", "L", "ML", "PIECE", "PACKET"]).optional(),
   grossQuantity: z.number().positive(),
-  shrinkageMarginPercent: z.number().min(0).max(50).default(5),
-  costPerUnit: z.number().positive().optional(),
+  shrinkageMarginPercent: z.number().min(0).max(50).default(0),
+  costPerUnit: z.number().nonnegative().optional(),
 });
 
 const bodySchema = z.object({
@@ -77,7 +77,7 @@ export async function PUT(
               name,
               category: line.category?.trim() || "General",
               unit: line.unit ?? "G",
-              costPerUnit: (line.costPerUnit ?? 1).toFixed(2),
+              costPerUnit: (line.costPerUnit ?? 0).toFixed(2),
               currentStock: "0.000",
             })
             .returning();
@@ -113,7 +113,12 @@ export async function PUT(
       .where(eq(menuItems.id, id))
       .returning();
 
-    return jsonOk({ menuItem, lines: bomRows.length });
+    const unpriced = body.lines
+      .filter((line) => !line.ingredientId && (line.costPerUnit ?? 0) <= 0)
+      .map((line) => line.name?.trim())
+      .filter((name): name is string => Boolean(name));
+
+    return jsonOk({ menuItem, lines: bomRows.length, unpriced });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return jsonError(err.issues[0]?.message ?? "Invalid input");

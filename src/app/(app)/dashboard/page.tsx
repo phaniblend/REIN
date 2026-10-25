@@ -93,9 +93,12 @@ export default function DashboardPage() {
   }
 
   const stock = ingredients.data?.ingredients ?? [];
-  const low = stock.filter(
-    (i) => num(i.parLevel) > 0 && num(i.currentStock) < num(i.parLevel),
-  );
+  const low = stock.filter((i) => {
+    const par = num(i.parLevel);
+    const onHand = num(i.currentStock);
+    if (onHand <= 0) return true;
+    return par > 0 && onHand < par;
+  });
   const inventoryValue = stock.reduce(
     (sum, i) => sum + num(i.currentStock) * num(i.costPerUnit),
     0,

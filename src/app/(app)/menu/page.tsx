@@ -63,9 +63,9 @@ function categorySortKey(category: string) {
 
 function statusLabel(status: string) {
   if (status === "APPROVED") return "Finalized";
-  if (status === "PENDING_APPROVAL") return "Pending";
+  if (status === "PENDING_APPROVAL" || status === "DRAFT") return "Pending";
   if (status === "REJECTED") return "Rejected";
-  return "Draft";
+  return "Pending";
 }
 
 export default function MenuPage() {
@@ -109,6 +109,7 @@ export default function MenuPage() {
             dishId: string;
             foodCostPercent: number | null;
             overTarget: boolean;
+            unpriced?: string[];
           }[],
         };
       }
@@ -117,6 +118,7 @@ export default function MenuPage() {
           dishId: string;
           foodCostPercent: number | null;
           overTarget: boolean;
+          unpriced?: string[];
         }[];
       }>;
     },
@@ -569,8 +571,13 @@ export default function MenuPage() {
                       </div>
                       <div className="flex flex-wrap gap-1">
                         <Badge>{statusLabel(item.menuApprovalStatus)}</Badge>
-                        <Badge>{item.recipe?.length ?? 0} ingredients</Badge>
-                        {costByDish.get(item.id)?.foodCostPercent != null && (
+                        <Badge>
+                          {item.recipe?.length ?? 0}{" "}
+                          {(item.recipe?.length ?? 0) === 1 ? "ingredient" : "ingredients"}
+                        </Badge>
+                        {costByDish.get(item.id)?.unpriced?.length ? (
+                          <Badge>Set item cost</Badge>
+                        ) : costByDish.get(item.id)?.foodCostPercent != null ? (
                           <Badge
                             className={
                               costByDish.get(item.id)?.overTarget
@@ -580,7 +587,7 @@ export default function MenuPage() {
                           >
                             {costByDish.get(item.id)!.foodCostPercent!.toFixed(0)}% food cost
                           </Badge>
-                        )}
+                        ) : null}
                         {allergenLabel(item) && <Badge>{allergenLabel(item)}</Badge>}
                         {item.isActive === false && <Badge>Inactive</Badge>}
                       </div>

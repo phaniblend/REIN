@@ -42,7 +42,7 @@ export function DataAlert({
       </div>
       {count !== undefined && (
         <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-[var(--accent)] px-2 text-xs font-semibold text-[var(--accent-fg)]">
-          {String(count).padStart(2, "0")}
+            {String(count)}
         </span>
       )}
     </div>

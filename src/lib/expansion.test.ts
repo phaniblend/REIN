@@ -2,13 +2,20 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { cogsCents } from "./cogs";
 import { parseInvoiceText } from "./invoice-text";
-import { convertQty, matchConfidence } from "./units";
+import { convertQty, matchConfidence, sameDish } from "./units";
 
 describe("units", () => {
   it("converts mass and volume", () => {
     assert.equal(convertQty(2, "KG", "G"), 2000);
     assert.equal(convertQty(500, "ML", "L"), 0.5);
     assert.equal(convertQty(1, "KG", "L"), null);
+  });
+
+  it("treats parenthetical and near-duplicate dish names as the same", () => {
+    assert.equal(sameDish("Pani Puri", "Pani Puri (Vegan)"), true);
+    assert.equal(sameDish("Chana Masala", "Classic Chana Masala"), true);
+    assert.equal(sameDish("Jeera Rice", "Jeera Rice (Cumin Rice)"), true);
+    assert.equal(sameDish("Dal", "Dal Makhani"), false);
   });
 
   it("scores exact names above the auto-map line", () => {
