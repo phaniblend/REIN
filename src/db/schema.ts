@@ -7,6 +7,7 @@ import {
   boolean,
   pgEnum,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -29,6 +30,29 @@ export const approvalStatusEnum = pgEnum("approval_status", [
   "PENDING_APPROVAL",
   "APPROVED",
   "REJECTED",
+]);
+export const orderSourceEnum = pgEnum("order_source", [
+  "restman",
+  "restaurant_pos",
+]);
+export const integrationProviderEnum = pgEnum("integration_provider", [
+  "demo",
+  "square",
+  "clover",
+  "toast",
+  "quickbooks",
+  "xero",
+  "deliverect",
+  "shifts",
+]);
+export const connectionStatusEnum = pgEnum("connection_status", [
+  "connected",
+  "error",
+  "disconnected",
+]);
+export const invoiceStatusEnum = pgEnum("invoice_status", [
+  "draft",
+  "confirmed",
 ]);
 export const orderStatusEnum = pgEnum("order_status", [
   "PENDING",
@@ -78,6 +102,8 @@ export const users = pgTable(
     phone: text("phone").unique(),
     passwordHash: text("password_hash"),
     role: roleEnum("role").notNull(),
+    hourlyRateCents: numeric("hourly_rate_cents", { precision: 10, scale: 0 }),
+    digestOptIn: boolean("digest_opt_in").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [
@@ -141,6 +167,9 @@ export const ingredients = pgTable(
     name: text("name").notNull(),
     category: text("category").notNull(),
     unit: unitEnum("unit").notNull(),
+    /** Empty means the stock unit is the base unit. */
+    baseUnit: text("base_unit").default("").notNull(),
+    allergens: text("allergens").default("").notNull(),
     costPerUnit: numeric("cost_per_unit", { precision: 10, scale: 2 }).notNull(),
     currentStock: numeric("current_stock", { precision: 12, scale: 3 })
       .default("0.000")
@@ -191,6 +220,10 @@ export const recipeBoms = pgTable("recipe_boms", {
     precision: 5,
     scale: 2,
   }).default("0.00"),
+  /** Usable yield after trim and cooking loss. 100 means no extra loss. */
+  yieldPercent: numeric("yield_percent", { precision: 5, scale: 2 })
+    .default("100.00")
+    .notNull(),
 });
 
 export const stockReceipts = pgTable(
@@ -209,6 +242,9 @@ export const stockReceipts = pgTable(
     quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull(),
     unitCost: numeric("unit_cost", { precision: 10, scale: 2 }).notNull(),
     supplierNote: text("supplier_note"),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "set null",
+    }),
     receivedAt: timestamp("received_at").defaultNow().notNull(),
   },
   (t) => [index("stock_receipts_restaurant_idx").on(t.restaurantId)],
@@ -226,6 +262,7 @@ export const orders = pgTable(
       .notNull(),
     tableNumber: text("table_number").notNull(),
     status: orderStatusEnum("status").default("PENDING").notNull(),
+    source: orderSourceEnum("source").default("restman").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("orders_restaurant_idx").on(t.restaurantId)],
@@ -262,6 +299,9 @@ export const wastageLogs = pgTable(
     quantity: numeric("quantity", { precision: 10, scale: 3 }).notNull(),
     kind: wastageKindEnum("kind").default("KITCHEN_SPOILED").notNull(),
     reason: text("reason").notNull(),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "set null",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (t) => [index("wastage_logs_restaurant_idx").on(t.restaurantId)],
@@ -305,6 +345,407 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   auth: text("auth").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const locations = pgTable(
+  "locations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    timezone: text("timezone").default("America/Chicago").notNull(),
+    closeHour: numeric("close_hour", { precision: 2, scale: 0 }).default("22").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("locations_restaurant_idx").on(t.restaurantId)],
+);
+
+export const integrationConnections = pgTable(
+  "integration_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    locationId: uuid("location_id")
+      .references(() => locations.id, { onDelete: "cascade" })
+      .notNull(),
+    provider: integrationProviderEnum("provider").notNull(),
+    status: connectionStatusEnum("status").default("connected").notNull(),
+    encryptedTokens: text("encrypted_tokens"),
+    scopes: text("scopes"),
+    lastSyncedAt: timestamp("last_synced_at"),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("integration_connections_restaurant_idx").on(t.restaurantId)],
+);
+
+export const posItems = pgTable(
+  "pos_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    connectionId: uuid("connection_id")
+      .references(() => integrationConnections.id, { onDelete: "cascade" })
+      .notNull(),
+    externalId: text("external_id").notNull(),
+    name: text("name").notNull(),
+    variation: text("variation"),
+    priceCents: numeric("price_cents", { precision: 10, scale: 0 }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("pos_items_external_uidx").on(t.connectionId, t.externalId),
+  ],
+);
+
+export const posItemMappings = pgTable(
+  "pos_item_mappings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    posItemId: uuid("pos_item_id")
+      .references(() => posItems.id, { onDelete: "cascade" })
+      .notNull(),
+    dishId: uuid("dish_id")
+      .references(() => menuItems.id, { onDelete: "cascade" })
+      .notNull(),
+    confidence: numeric("confidence", { precision: 4, scale: 3 }).notNull(),
+    mappedBy: text("mapped_by").notNull(),
+    /** confirmed counts in usage. suggested is a chef proposal. */
+    status: text("status").default("confirmed").notNull(),
+    mappedAt: timestamp("mapped_at").defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("pos_item_mappings_item_uidx").on(t.posItemId)],
+);
+
+export const posSaleLines = pgTable(
+  "pos_sale_lines",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    connectionId: uuid("connection_id")
+      .references(() => integrationConnections.id, { onDelete: "cascade" })
+      .notNull(),
+    externalLineId: text("external_line_id").notNull(),
+    posItemId: uuid("pos_item_id")
+      .references(() => posItems.id, { onDelete: "cascade" })
+      .notNull(),
+    qty: numeric("qty", { precision: 10, scale: 3 }).notNull(),
+    netCents: numeric("net_cents", { precision: 12, scale: 0 }).notNull(),
+    channel: text("channel").default("in_house").notNull(),
+    soldAt: timestamp("sold_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("pos_sale_lines_external_uidx").on(
+      t.connectionId,
+      t.externalLineId,
+    ),
+    index("pos_sale_lines_sold_idx").on(t.soldAt),
+  ],
+);
+
+export const suppliers = pgTable(
+  "suppliers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    email: text("email"),
+    phone: text("phone"),
+    orderCutoff: text("order_cutoff"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("suppliers_restaurant_idx").on(t.restaurantId)],
+);
+
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "cascade",
+    }),
+    supplierId: uuid("supplier_id").references(() => suppliers.id),
+    supplierName: text("supplier_name").notNull(),
+    imageUrl: text("image_url"),
+    status: invoiceStatusEnum("status").default("draft").notNull(),
+    totalCents: numeric("total_cents", { precision: 12, scale: 0 })
+      .default("0")
+      .notNull(),
+    invoiceDate: timestamp("invoice_date").defaultNow().notNull(),
+    confirmedBy: uuid("confirmed_by").references(() => users.id),
+    confirmedAt: timestamp("confirmed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("invoices_restaurant_idx").on(t.restaurantId)],
+);
+
+export const invoiceLines = pgTable("invoice_lines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  invoiceId: uuid("invoice_id")
+    .references(() => invoices.id, { onDelete: "cascade" })
+    .notNull(),
+  rawText: text("raw_text").notNull(),
+  ingredientId: uuid("ingredient_id").references(() => ingredients.id),
+  qty: numeric("qty", { precision: 12, scale: 3 }).notNull(),
+  unitPriceCents: numeric("unit_price_cents", {
+    precision: 12,
+    scale: 0,
+  }).notNull(),
+  confidence: numeric("confidence", { precision: 4, scale: 3 }).notNull(),
+});
+
+export const priceHistory = pgTable(
+  "price_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ingredientId: uuid("ingredient_id")
+      .references(() => ingredients.id, { onDelete: "cascade" })
+      .notNull(),
+    supplierName: text("supplier_name"),
+    unitPriceCents: numeric("unit_price_cents", {
+      precision: 12,
+      scale: 0,
+    }).notNull(),
+    observedAt: timestamp("observed_at").defaultNow().notNull(),
+  },
+  (t) => [index("price_history_ingredient_idx").on(t.ingredientId)],
+);
+
+export const alerts = pgTable(
+  "alerts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "set null",
+    }),
+    type: text("type").notNull(),
+    payload: text("payload").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    readAt: timestamp("read_at"),
+  },
+  (t) => [index("alerts_restaurant_idx").on(t.restaurantId)],
+);
+
+export const supplierItems = pgTable(
+  "supplier_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    supplierId: uuid("supplier_id")
+      .references(() => suppliers.id, { onDelete: "cascade" })
+      .notNull(),
+    ingredientId: uuid("ingredient_id")
+      .references(() => ingredients.id, { onDelete: "cascade" })
+      .notNull(),
+    packSize: numeric("pack_size", { precision: 12, scale: 3 }).default("1").notNull(),
+    packUnit: text("pack_unit").default("").notNull(),
+    lastPriceCents: numeric("last_price_cents", { precision: 12, scale: 0 })
+      .default("0")
+      .notNull(),
+  },
+  (t) => [index("supplier_items_supplier_idx").on(t.supplierId)],
+);
+
+export const purchaseOrders = pgTable(
+  "purchase_orders",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "set null",
+    }),
+    supplierId: uuid("supplier_id").references(() => suppliers.id),
+    supplierName: text("supplier_name").notNull(),
+    status: text("status").default("draft").notNull(),
+    sentAt: timestamp("sent_at"),
+    sentBy: uuid("sent_by").references(() => users.id),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("purchase_orders_restaurant_idx").on(t.restaurantId)],
+);
+
+export const poLines = pgTable("po_lines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  purchaseOrderId: uuid("purchase_order_id")
+    .references(() => purchaseOrders.id, { onDelete: "cascade" })
+    .notNull(),
+  ingredientId: uuid("ingredient_id")
+    .references(() => ingredients.id)
+    .notNull(),
+  qty: numeric("qty", { precision: 12, scale: 3 }).notNull(),
+});
+
+export const syncJobs = pgTable(
+  "sync_jobs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    connectionId: uuid("connection_id")
+      .references(() => integrationConnections.id, { onDelete: "cascade" })
+      .notNull(),
+    kind: text("kind").notNull(),
+    status: text("status").default("pending").notNull(),
+    attempts: numeric("attempts", { precision: 4, scale: 0 }).default("0").notNull(),
+    lastError: text("last_error"),
+    runAt: timestamp("run_at").defaultNow().notNull(),
+    finishedAt: timestamp("finished_at"),
+  },
+  (t) => [index("sync_jobs_connection_idx").on(t.connectionId)],
+);
+
+export const accountingExports = pgTable(
+  "accounting_exports",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    invoiceId: uuid("invoice_id").references(() => invoices.id, {
+      onDelete: "set null",
+    }),
+    provider: text("provider").notNull(),
+    status: text("status").default("queued").notNull(),
+    payload: text("payload").notNull(),
+    externalId: text("external_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("accounting_exports_restaurant_idx").on(t.restaurantId)],
+);
+
+export const invoiceFiles = pgTable("invoice_files", {
+  invoiceId: uuid("invoice_id")
+    .primaryKey()
+    .references(() => invoices.id, { onDelete: "cascade" }),
+  mime: text("mime").notNull(),
+  data: text("data").notNull(),
+});
+
+export const digestRuns = pgTable(
+  "digest_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "set null",
+    }),
+    body: text("body").notNull(),
+    channel: text("channel").notNull(),
+    sentAt: timestamp("sent_at").defaultNow().notNull(),
+  },
+  (t) => [index("digest_runs_restaurant_idx").on(t.restaurantId)],
+);
+
+export const staffShifts = pgTable(
+  "staff_shifts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "set null",
+    }),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    startsAt: timestamp("starts_at").notNull(),
+    endsAt: timestamp("ends_at").notNull(),
+    hourlyRateCents: numeric("hourly_rate_cents", { precision: 10, scale: 0 })
+      .default("0")
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("staff_shifts_restaurant_idx").on(t.restaurantId)],
+);
+
+export const foodSafetyLogs = pgTable(
+  "food_safety_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    locationId: uuid("location_id").references(() => locations.id, {
+      onDelete: "set null",
+    }),
+    userId: uuid("user_id")
+      .references(() => users.id)
+      .notNull(),
+    kind: text("kind").notNull(),
+    reading: text("reading").notNull(),
+    note: text("note"),
+    photo: text("photo"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("food_safety_logs_restaurant_idx").on(t.restaurantId)],
+);
+
+export const locationStock = pgTable(
+  "location_stock",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    locationId: uuid("location_id")
+      .references(() => locations.id, { onDelete: "cascade" })
+      .notNull(),
+    ingredientId: uuid("ingredient_id")
+      .references(() => ingredients.id, { onDelete: "cascade" })
+      .notNull(),
+    qty: numeric("qty", { precision: 12, scale: 3 }).default("0").notNull(),
+  },
+  (t) => [
+    uniqueIndex("location_stock_uidx").on(t.locationId, t.ingredientId),
+  ],
+);
+
+export const stockTransfers = pgTable(
+  "stock_transfers",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    fromLocationId: uuid("from_location_id")
+      .references(() => locations.id)
+      .notNull(),
+    toLocationId: uuid("to_location_id")
+      .references(() => locations.id)
+      .notNull(),
+    ingredientId: uuid("ingredient_id")
+      .references(() => ingredients.id)
+      .notNull(),
+    qty: numeric("qty", { precision: 12, scale: 3 }).notNull(),
+    createdBy: uuid("created_by")
+      .references(() => users.id)
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("stock_transfers_restaurant_idx").on(t.restaurantId)],
+);
+
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: uuid("user_id").references(() => users.id),
+    action: text("action").notNull(),
+    target: text("target").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [index("audit_events_restaurant_idx").on(t.restaurantId)],
+);
 
 /** One-shot deploy tasks. Kept in schema so drizzle push does not drop the marker. */
 export const maintenanceFlags = pgTable("maintenance_flags", {

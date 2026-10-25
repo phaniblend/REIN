@@ -78,6 +78,22 @@ export default function RecipesPage() {
 
   const isChef = me.data?.user?.role === "CHEF";
   const isOwner = me.data?.user?.role === "OWNER";
+  const canSeeCost = isChef || isOwner;
+
+  const costs = useQuery({
+    queryKey: ["menu-costs"],
+    enabled: canSeeCost,
+    queryFn: async () => {
+      const res = await fetch("/api/menu/costs");
+      if (!res.ok) return { costs: [] as { dishId: string; foodCostPercent: number | null; overTarget: boolean }[] };
+      return res.json() as Promise<{
+        costs: { dishId: string; foodCostPercent: number | null; overTarget: boolean }[];
+      }>;
+    },
+  });
+  const costByDish = new Map(
+    (costs.data?.costs ?? []).map((row) => [row.dishId, row]),
+  );
 
   const menu = useQuery({
     queryKey: ["menu"],
@@ -369,6 +385,9 @@ export default function RecipesPage() {
                           {(item.recipe?.length ?? 0) > 0
                             ? `${item.recipe.length} ingredient${item.recipe.length === 1 ? "" : "s"}`
                             : "No recipe yet"}
+                          {costByDish.get(item.id)?.foodCostPercent != null
+                            ? ` · ${costByDish.get(item.id)!.foodCostPercent!.toFixed(0)}% food cost`
+                            : ""}
                         </p>
                       </div>
                       <Badge>
@@ -390,6 +409,9 @@ export default function RecipesPage() {
                           {(item.recipe?.length ?? 0) > 0
                             ? `${item.recipe.length} ingredient${item.recipe.length === 1 ? "" : "s"}`
                             : "No recipe yet"}
+                          {costByDish.get(item.id)?.foodCostPercent != null
+                            ? ` · ${costByDish.get(item.id)!.foodCostPercent!.toFixed(0)}% food cost`
+                            : ""}
                         </p>
                       </div>
                       <Badge>{signed ? "Chef finalized" : "Awaiting chef"}</Badge>

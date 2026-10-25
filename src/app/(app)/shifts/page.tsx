@@ -34,13 +34,14 @@ export default function ShiftsPage() {
     results: AvtRow[];
     alerts: AvtRow[];
     thresholdPercent: number;
+    posCoverage?: { percent: number | null };
   } | null>(null);
 
   const list = useQuery({
     queryKey: ["ingredients"],
     queryFn: async () => {
       const res = await fetch("/api/ingredients");
-      return res.json() as Promise<{ ingredients: Ingredient[] }>;
+      return res.json() as Promise<{ ingredients: Ingredient[]; locationName?: string }>;
     },
   });
 
@@ -86,6 +87,7 @@ export default function ShiftsPage() {
           Blind shift count
         </h1>
         <p className="text-sm text-[var(--muted)]">
+          {list.data?.locationName ? `Counting ${list.data.locationName}. ` : ""}
           Enter physical counts without seeing theoretical balances. AvT runs on
           submit.
         </p>
@@ -139,6 +141,12 @@ export default function ShiftsPage() {
             <CardTitle>AvT results</CardTitle>
             <Badge>Threshold {result.thresholdPercent}%</Badge>
           </div>
+          {result.posCoverage?.percent != null && (
+            <p className="text-sm text-[var(--muted)]">
+              {result.posCoverage.percent.toFixed(0)}% of register sales in this
+              window have a recipe.
+            </p>
+          )}
           {result.alerts.length > 0 && (
             <p className="text-sm text-[var(--danger)]">
               {result.alerts.length} ingredient(s) exceed unaccounted-loss

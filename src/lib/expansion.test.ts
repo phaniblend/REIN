@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { cogsCents } from "./cogs";
+import { parseInvoiceText } from "./invoice-text";
+import { convertQty, matchConfidence } from "./units";
+
+describe("units", () => {
+  it("converts mass and volume", () => {
+    assert.equal(convertQty(2, "KG", "G"), 2000);
+    assert.equal(convertQty(500, "ML", "L"), 0.5);
+    assert.equal(convertQty(1, "KG", "L"), null);
+  });
+
+  it("scores exact names above the auto-map line", () => {
+    assert.equal(matchConfidence("Chana Tikka", "chana tikka"), 1);
+    assert.ok(matchConfidence("House special", "Dal") < 0.9);
+  });
+});
+
+describe("invoices", () => {
+  it("reads a supplier line and flags a messy one", () => {
+    const lines = parseInvoiceText("Onion 8 KG 1.50\nnot a line");
+    assert.equal(lines[0]?.name, "Onion");
+    assert.equal(lines[0]?.qty, 8);
+    assert.equal(lines[0]?.unit, "KG");
+    assert.equal(lines[0]?.unitPrice, 1.5);
+    assert.ok((lines[1]?.confidence ?? 1) < 0.7);
+  });
+});
+
+describe("books", () => {
+  it("turns food-cost percent into cents", () => {
+    assert.equal(cogsCents(10000, 32), 3200);
+    assert.equal(cogsCents(0, 32), 0);
+  });
+});

@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { ingredients, restaurants, shiftCounts } from "@/db/schema";
+import { locations, restaurants, shiftCounts } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { computeAvT } from "@/lib/avt";
+import { posCoverage } from "@/lib/pos-sync";
+import { binsFor, ensureLocationBins, setBin } from "@/lib/active-location";
 import { num } from "@/lib/utils";
 
 const schema = z.object({
@@ -33,6 +35,14 @@ export async function POST(request: Request) {
 
     const threshold = num(restaurant.varianceThresholdPercent, 5);
     const since = new Date(Date.now() - body.sinceHours * 60 * 60 * 1000);
+    const location = await ensureLocationBins(session.restaurantId);
+    const [first] = await db
+      .select()
+      .from(locations)
+      .where(eq(locations.restaurantId, session.restaurantId))
+      .limit(1);
+    const bins = await binsFor(location.id);
+    const onHand = Object.fromEntries(bins);
 
     const results = await computeAvT({
       restaurantId: session.restaurantId,
@@ -40,6 +50,9 @@ export async function POST(request: Request) {
       openingStocks: body.openingStocks,
       since,
       thresholdPercent: threshold,
+      onHand,
+      locationId: location.id,
+      includeLegacy: first?.id === location.id,
     });
 
     const saved = [];
@@ -65,20 +78,20 @@ export async function POST(request: Request) {
       saved.push(savedRow);
 
       if (body.commitStock) {
-        await db
-          .update(ingredients)
-          .set({ currentStock: row.physicalEndingCount.toFixed(3) })
-          .where(eq(ingredients.id, row.ingredientId));
+        await setBin(location.id, row.ingredientId, row.physicalEndingCount);
       }
     }
 
     const alerts = results.filter((r) => r.exceedsThreshold);
+
+    const coverage = await posCoverage(session.restaurantId, since);
 
     return jsonOk({
       thresholdPercent: threshold,
       results,
       alerts,
       savedCount: saved.length,
+      posCoverage: coverage,
     });
   } catch (err) {
     if (err instanceof z.ZodError) {

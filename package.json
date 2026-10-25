@@ -11,6 +11,7 @@
     "start": "next start",
     "start:railway": "node scripts/start-railway.cjs",
     "lint": "eslint",
+    "test": "tsx --test src/lib/expansion.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",

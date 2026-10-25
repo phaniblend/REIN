@@ -2,12 +2,18 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Building2,
+  CalendarClock,
   ClipboardList,
+  FileText,
   LayoutDashboard,
+  Plug,
   LogOut,
   MapPinned,
   Package,
   Scale,
+  ShoppingCart,
+  Thermometer,
   Trash2,
   Users,
   UtensilsCrossed,
@@ -39,6 +45,23 @@ const allLinks: NavLink[] = [
     roles: ["CHEF"],
   },
   { href: "/team", label: "Team", icon: Users, roles: ["OWNER"] },
+  { href: "/integrations", label: "Connect", icon: Plug, roles: ["OWNER", "CHEF"] },
+  {
+    href: "/invoices",
+    label: "Invoices",
+    icon: FileText,
+    roles: ["OWNER", "CHEF", "STOCK_CLERK"],
+  },
+  {
+    href: "/purchasing",
+    label: "Orders",
+    icon: ShoppingCart,
+    roles: ["OWNER", "CHEF", "STOCK_CLERK"],
+  },
+  { href: "/prep", label: "Prep", icon: ClipboardList, roles: ["OWNER", "CHEF"] },
+  { href: "/schedule", label: "Labor", icon: CalendarClock, roles: ["OWNER"] },
+  { href: "/safety", label: "Safety", icon: Thermometer },
+  { href: "/places", label: "Places", icon: Building2, roles: ["OWNER"] },
   { href: "/inventory", label: "Stock", icon: Package },
   {
     href: "/recipes",
@@ -120,12 +143,7 @@ export function AppShell({
       <main className="flex-1 px-4 py-4">{children}</main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--border)] bg-[color-mix(in_oklab,var(--bg)_92%,transparent)] backdrop-blur-md">
-        <div
-          className={cn(
-            "mx-auto grid max-w-lg gap-0.5 px-1 py-1.5",
-            links.length <= 5 ? "grid-cols-5" : "grid-cols-4 sm:grid-cols-8",
-          )}
-        >
+        <div className="mx-auto flex max-w-lg gap-0.5 overflow-x-auto px-1 py-1.5">
           {links.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
@@ -133,7 +151,7 @@ export function AppShell({
                 key={`${href}-${label}`}
                 href={href}
                 className={cn(
-                  "flex flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px]",
+                  "flex min-w-14 shrink-0 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px]",
                   active
                     ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                     : "text-[var(--muted)]",

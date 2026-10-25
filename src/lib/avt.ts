@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   ingredients,
@@ -9,6 +9,7 @@ import {
   stockReceipts,
   wastageLogs,
 } from "@/db/schema";
+import { theoreticalFromPos } from "@/lib/pos-sync";
 import { num } from "@/lib/utils";
 
 export type IngredientAvT = {
@@ -43,6 +44,11 @@ export async function computeAvT(params: {
   openingStocks?: Record<string, number>;
   since?: Date;
   thresholdPercent: number;
+  /** On-hand at the location being counted. Falls back to restaurant stock. */
+  onHand?: Record<string, number>;
+  locationId?: string;
+  /** Count older receipts that were logged before locations existed. */
+  includeLegacy?: boolean;
 }): Promise<IngredientAvT[]> {
   const since = params.since ?? new Date(Date.now() - 1000 * 60 * 60 * 16);
 
@@ -54,21 +60,42 @@ export async function computeAvT(params: {
   const ingredientIds = stockRows.map((i) => i.id);
   if (ingredientIds.length === 0) return [];
 
+  const receiptWhere = [
+    eq(stockReceipts.restaurantId, params.restaurantId),
+    gte(stockReceipts.receivedAt, since),
+    inArray(stockReceipts.ingredientId, ingredientIds),
+  ];
+  if (params.locationId) {
+    receiptWhere.push(
+      params.includeLegacy
+        ? or(
+            eq(stockReceipts.locationId, params.locationId),
+            isNull(stockReceipts.locationId),
+          )!
+        : eq(stockReceipts.locationId, params.locationId),
+    );
+  }
   const receiptRows = await db
     .select({
       ingredientId: stockReceipts.ingredientId,
       qty: sql<string>`coalesce(sum(${stockReceipts.quantity}), 0)`,
     })
     .from(stockReceipts)
-    .where(
-      and(
-        eq(stockReceipts.restaurantId, params.restaurantId),
-        gte(stockReceipts.receivedAt, since),
-        inArray(stockReceipts.ingredientId, ingredientIds),
-      ),
-    )
+    .where(and(...receiptWhere))
     .groupBy(stockReceipts.ingredientId);
 
+  const wasteWhere = [
+    eq(wastageLogs.restaurantId, params.restaurantId),
+    gte(wastageLogs.createdAt, since),
+    inArray(wastageLogs.ingredientId, ingredientIds),
+  ];
+  if (params.locationId) {
+    wasteWhere.push(
+      params.includeLegacy
+        ? or(eq(wastageLogs.locationId, params.locationId), isNull(wastageLogs.locationId))!
+        : eq(wastageLogs.locationId, params.locationId),
+    );
+  }
   const wasteRows = await db
     .select({
       ingredientId: wastageLogs.ingredientId,
@@ -76,13 +103,7 @@ export async function computeAvT(params: {
       qty: sql<string>`coalesce(sum(${wastageLogs.quantity}), 0)`,
     })
     .from(wastageLogs)
-    .where(
-      and(
-        eq(wastageLogs.restaurantId, params.restaurantId),
-        gte(wastageLogs.createdAt, since),
-        inArray(wastageLogs.ingredientId, ingredientIds),
-      ),
-    )
+    .where(and(...wasteWhere))
     .groupBy(wastageLogs.ingredientId, wastageLogs.kind);
 
   const soldBom = await db
@@ -91,7 +112,8 @@ export async function computeAvT(params: {
       theoretical: sql<string>`coalesce(sum(
         ${orderItems.quantity}::numeric *
         ${recipeBoms.grossQuantity}::numeric *
-        (1 + coalesce(${recipeBoms.shrinkageMarginPercent}, 0) / 100.0)
+        (1 + coalesce(${recipeBoms.shrinkageMarginPercent}, 0) / 100.0) *
+        (100.0 / greatest(coalesce(${recipeBoms.yieldPercent}, 100), 1))
       ), 0)`,
     })
     .from(orderItems)
@@ -101,6 +123,7 @@ export async function computeAvT(params: {
     .where(
       and(
         eq(orders.restaurantId, params.restaurantId),
+        eq(orders.source, "restman"),
         gte(orders.createdAt, since),
         inArray(orderItems.status, ["SERVED", "PREPARING", "RETURNED"]),
         inArray(recipeBoms.ingredientId, ingredientIds),
@@ -111,9 +134,14 @@ export async function computeAvT(params: {
   const receiptsMap = Object.fromEntries(
     receiptRows.map((r) => [r.ingredientId, num(r.qty)]),
   );
-  const theoreticalMap = Object.fromEntries(
+  const theoreticalMap: Record<string, number> = Object.fromEntries(
     soldBom.map((r) => [r.ingredientId, num(r.theoretical)]),
   );
+  const posUsage = await theoreticalFromPos(params.restaurantId, since);
+  for (const [ingredientId, qty] of Object.entries(posUsage)) {
+    if (!ingredientIds.includes(ingredientId)) continue;
+    theoreticalMap[ingredientId] = (theoreticalMap[ingredientId] ?? 0) + qty;
+  }
 
   const kitchenWaste: Record<string, number> = {};
   const returnedWaste: Record<string, number> = {};
@@ -139,7 +167,7 @@ export async function computeAvT(params: {
       const openingStock =
         params.openingStocks?.[row.id] !== undefined
           ? params.openingStocks[row.id]
-          : num(row.currentStock) - received + deductedWaste;
+          : (params.onHand?.[row.id] ?? num(row.currentStock)) - received + deductedWaste;
 
       const physicalEndingCount = ending;
       const actualUsage = openingStock + received - physicalEndingCount;

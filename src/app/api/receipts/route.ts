@@ -5,6 +5,7 @@ import { ingredients, stockReceipts } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { num } from "@/lib/utils";
+import { activeLocation, bumpBin } from "@/lib/active-location";
 import { sql } from "drizzle-orm";
 
 const schema = z.object({
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
       .limit(1);
     if (!ing) return jsonError("Ingredient not found", 404);
 
+    const location = await activeLocation(session.restaurantId);
     const [receipt] = await db
       .insert(stockReceipts)
       .values({
@@ -44,19 +46,17 @@ export async function POST(request: Request) {
         quantity: body.quantity.toFixed(3),
         unitCost: body.unitCost.toFixed(2),
         supplierNote: body.supplierNote,
+        locationId: location.id,
       })
       .returning();
 
-    const nextStock = num(ing.currentStock) + body.quantity;
+    const { onHand } = await bumpBin(location.id, ing.id, body.quantity);
     await db
       .update(ingredients)
-      .set({
-        currentStock: nextStock.toFixed(3),
-        costPerUnit: body.unitCost.toFixed(2),
-      })
+      .set({ costPerUnit: body.unitCost.toFixed(2) })
       .where(eq(ingredients.id, ing.id));
 
-    return jsonOk({ receipt, currentStock: nextStock }, { status: 201 });
+    return jsonOk({ receipt, currentStock: onHand }, { status: 201 });
   } catch (err) {
     if (err instanceof z.ZodError) {
       return jsonError(err.issues[0]?.message ?? "Invalid input");

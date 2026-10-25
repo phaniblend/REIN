@@ -53,6 +53,27 @@ export default function DashboardPage() {
     },
   });
 
+  const integrations = useQuery({
+    queryKey: ["integrations"],
+    queryFn: async () => {
+      const res = await fetch("/api/integrations");
+      if (!res.ok) return { connections: [], catalog: [] };
+      return res.json() as Promise<{
+        connections: { status: string; lastSyncedAt: string | null }[];
+        catalog: { dishId: string | null }[];
+      }>;
+    },
+  });
+
+  const alerts = useQuery({
+    queryKey: ["alerts"],
+    queryFn: async () => {
+      const res = await fetch("/api/alerts");
+      if (!res.ok) return { alerts: [] as { id: string; type: string; payload: string }[] };
+      return res.json() as Promise<{ alerts: { id: string; type: string; payload: string }[] }>;
+    },
+  });
+
   const menu = useQuery({
     queryKey: ["menu"],
     queryFn: async () => {
@@ -115,6 +136,62 @@ export default function DashboardPage() {
 
       <Card>
         <MiniBarChart title="Usage by station" bars={chartBars} />
+      </Card>
+
+      <Card className="space-y-1">
+        <CardTitle>Register</CardTitle>
+        <p className="text-sm text-[var(--muted)]">
+          {(() => {
+            const live = (integrations.data?.connections ?? []).find(
+              (row) => row.status === "connected",
+            );
+            const unmapped = (integrations.data?.catalog ?? []).filter(
+              (row) => !row.dishId,
+            ).length;
+            if (!live) return "No register connected yet.";
+            const when = live.lastSyncedAt
+              ? new Date(live.lastSyncedAt).toLocaleString()
+              : "not yet";
+            return `Last synced ${when}. ${unmapped} item${unmapped === 1 ? "" : "s"} still need a recipe.`;
+          })()}
+        </p>
+      </Card>
+
+      <Card className="space-y-2">
+        <CardTitle>Today</CardTitle>
+        <p className="text-sm text-[var(--muted)]">
+          {(alerts.data?.alerts ?? []).length === 0
+            ? "No price or sync alerts."
+            : (alerts.data?.alerts ?? [])
+                .map((alert) => alert.type.replaceAll("_", " "))
+                .join(", ")}
+        </p>
+        <button
+          type="button"
+          className="text-sm font-medium text-[var(--accent)]"
+          onClick={async () => {
+            const res = await fetch("/api/accounting/cogs", { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) return;
+            window.alert(
+              data.amountCents
+                ? `Food cost entry saved for $${(data.amountCents / 100).toFixed(2)}.`
+                : "No sales yet today, so the food-cost entry is zero.",
+            );
+          }}
+        >
+          Post today&apos;s food cost to the books
+        </button>
+        <button
+          type="button"
+          className="text-sm font-medium text-[var(--accent)]"
+          onClick={async () => {
+            await fetch("/api/digest", { method: "POST" });
+            await alerts.refetch();
+          }}
+        >
+          Send today&apos;s digest
+        </button>
       </Card>
 
       <DataAlert

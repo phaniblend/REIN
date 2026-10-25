@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { ingredients, wastageLogs } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
-import { num } from "@/lib/utils";
+import { activeLocation, bumpBin } from "@/lib/active-location";
 import { and } from "drizzle-orm";
 
 const schema = z.object({
@@ -60,6 +60,7 @@ export async function POST(request: Request) {
       .limit(1);
     if (!ing) return jsonError("Ingredient not found", 404);
 
+    const location = await activeLocation(session.restaurantId);
     const [log] = await db
       .insert(wastageLogs)
       .values({
@@ -69,16 +70,12 @@ export async function POST(request: Request) {
         quantity: body.quantity.toFixed(3),
         kind: body.kind,
         reason: body.reason,
+        locationId: location.id,
       })
       .returning();
 
-    // Spoiled / wasted reduces on-hand; reused returns to stock (no deduct)
     if (body.kind !== "POS_RETURNED_REUSED") {
-      const next = Math.max(0, num(ing.currentStock) - body.quantity);
-      await db
-        .update(ingredients)
-        .set({ currentStock: next.toFixed(3) })
-        .where(eq(ingredients.id, ing.id));
+      await bumpBin(location.id, ing.id, -body.quantity);
     }
 
     return jsonOk({ wastage: log }, { status: 201 });

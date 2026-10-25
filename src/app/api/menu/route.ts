@@ -42,6 +42,7 @@ export async function GET() {
       ingredientName: ingredients.name,
       ingredientUnit: ingredients.unit,
       ingredientCategory: ingredients.category,
+      ingredientAllergens: ingredients.allergens,
     })
     .from(recipeBoms)
     .innerJoin(ingredients, eq(ingredients.id, recipeBoms.ingredientId))

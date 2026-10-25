@@ -20,6 +20,17 @@ type MenuItem = {
   recipe: unknown[];
 };
 
+function allergenLabel(item: MenuItem) {
+  const tags = new Set<string>();
+  for (const line of item.recipe as { ingredientAllergens?: string }[]) {
+    for (const tag of (line.ingredientAllergens ?? "").split(",")) {
+      const clean = tag.trim();
+      if (clean) tags.add(clean);
+    }
+  }
+  return [...tags].join(", ");
+}
+
 const CATEGORY_ORDER = [
   "Appetizers",
   "Soups & Salads",
@@ -87,6 +98,32 @@ export default function MenuPage() {
     },
   });
   const isOwner = me.data?.user?.role === "OWNER";
+  const costs = useQuery({
+    queryKey: ["menu-costs"],
+    enabled: isOwner,
+    queryFn: async () => {
+      const res = await fetch("/api/menu/costs");
+      if (!res.ok) {
+        return {
+          costs: [] as {
+            dishId: string;
+            foodCostPercent: number | null;
+            overTarget: boolean;
+          }[],
+        };
+      }
+      return res.json() as Promise<{
+        costs: {
+          dishId: string;
+          foodCostPercent: number | null;
+          overTarget: boolean;
+        }[];
+      }>;
+    },
+  });
+  const costByDish = new Map(
+    (costs.data?.costs ?? []).map((row) => [row.dishId, row]),
+  );
 
   const menu = useQuery({
     queryKey: ["menu"],
@@ -533,6 +570,18 @@ export default function MenuPage() {
                       <div className="flex flex-wrap gap-1">
                         <Badge>{statusLabel(item.menuApprovalStatus)}</Badge>
                         <Badge>{item.recipe?.length ?? 0} ingredients</Badge>
+                        {costByDish.get(item.id)?.foodCostPercent != null && (
+                          <Badge
+                            className={
+                              costByDish.get(item.id)?.overTarget
+                                ? "bg-[var(--danger)] text-white"
+                                : undefined
+                            }
+                          >
+                            {costByDish.get(item.id)!.foodCostPercent!.toFixed(0)}% food cost
+                          </Badge>
+                        )}
+                        {allergenLabel(item) && <Badge>{allergenLabel(item)}</Badge>}
                         {item.isActive === false && <Badge>Inactive</Badge>}
                       </div>
                       {isOwner && (

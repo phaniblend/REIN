@@ -538,3 +538,53 @@ Location: ${locationLabel}`;
 
   return generateJson(prompt, locationCuisineStatsSchema);
 }
+
+const invoiceLineSchema = z.object({
+  lines: z.array(
+    z.object({
+      name: z.string(),
+      qty: z.number(),
+      unit: z.string(),
+      unitPrice: z.number(),
+      confidence: z.number(),
+    }),
+  ),
+});
+
+export async function readInvoicePhoto(imageBase64: string, mime: string) {
+  const apiKey = resolveApiKey();
+  const model = modelCandidates()[0] ?? "gemini-2.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
+    signal: AbortSignal.timeout(55_000),
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: 'Read this supplier invoice. Return JSON {"lines":[{"name":string,"qty":number,"unit":string,"unitPrice":number,"confidence":number}]}. confidence is 0 to 1. Use units KG, G, L, ML, PIECE, or PACKET.',
+            },
+            { inline_data: { mime_type: mime, data: imageBase64 } },
+          ],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: "application/json",
+      },
+    }),
+  });
+  if (!res.ok) throw new Error("Could not read the invoice photo");
+  const body = (await res.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const text = body.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const parsed = invoiceLineSchema.parse(JSON.parse(text));
+  return parsed.lines;
+}

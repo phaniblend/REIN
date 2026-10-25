@@ -27,6 +27,7 @@ export default function InventoryPage() {
     costPerUnit: "0",
     currentStock: "0",
     parLevel: "0",
+    allergens: "",
   });
   const [receipt, setReceipt] = useState({
     ingredientId: "",
@@ -38,7 +39,7 @@ export default function InventoryPage() {
     queryKey: ["ingredients"],
     queryFn: async () => {
       const res = await fetch("/api/ingredients");
-      return res.json() as Promise<{ ingredients: Ingredient[] }>;
+      return res.json() as Promise<{ ingredients: Ingredient[]; locationName?: string }>;
     },
   });
 
@@ -54,6 +55,7 @@ export default function InventoryPage() {
           costPerUnit: Number(form.costPerUnit),
           currentStock: Number(form.currentStock),
           parLevel: Number(form.parLevel),
+          allergens: form.allergens,
         }),
       });
       const data = await res.json();
@@ -69,6 +71,7 @@ export default function InventoryPage() {
         costPerUnit: "0",
         currentStock: "0",
         parLevel: "0",
+        allergens: "",
       });
     },
   });
@@ -101,6 +104,11 @@ export default function InventoryPage() {
       <h1 className="font-[family-name:var(--font-display)] text-2xl font-semibold text-[var(--accent)]">
         Stock
       </h1>
+      {list.data?.locationName && (
+        <p className="text-sm text-[var(--muted)]">
+          On hand at {list.data.locationName}. Change site under Places.
+        </p>
+      )}
 
       <Card className="space-y-3">
         <CardTitle>Add ingredient</CardTitle>
@@ -163,6 +171,14 @@ export default function InventoryPage() {
                 type="number"
                 value={form.parLevel}
                 onChange={(e) => setForm({ ...form, parLevel: e.target.value })}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Allergens</Label>
+              <Input
+                value={form.allergens}
+                onChange={(e) => setForm({ ...form, allergens: e.target.value })}
+                placeholder="e.g. milk, gluten"
               />
             </div>
           </div>
