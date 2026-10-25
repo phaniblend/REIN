@@ -97,13 +97,12 @@ export async function PUT(
     await db.delete(recipeBoms).where(eq(recipeBoms.menuItemId, id));
     await db.insert(recipeBoms).values(bomRows);
 
-    const updates: Partial<typeof menuItems.$inferInsert> = {
-      recipeApprovalStatus: body.finalize ? "APPROVED" : "PENDING_APPROVAL",
-    };
-    if (body.finalize) {
-      updates.chefSignedAt = new Date();
+    const updates: Partial<typeof menuItems.$inferInsert> = {};
+    if (body.finalize || item.chefSignedAt) {
+      updates.recipeApprovalStatus = "APPROVED";
+      if (body.finalize) updates.chefSignedAt = new Date();
     } else {
-      // Draft/re-edit clears chef sign-off so dish returns to the setup queue.
+      updates.recipeApprovalStatus = "PENDING_APPROVAL";
       updates.chefSignedAt = null;
     }
 

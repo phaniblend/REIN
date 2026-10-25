@@ -159,9 +159,11 @@ export default function RecipesPage() {
     mutationFn: async ({
       id,
       finalize,
+      keepFinal,
     }: {
       id: string;
       finalize: boolean;
+      keepFinal?: boolean;
     }) => {
       const payloadLines = lines
         .filter((l) => Number(l.grossQuantity) > 0 && (l.ingredientId || l.name))
@@ -199,9 +201,11 @@ export default function RecipesPage() {
       setMessage(
         vars.finalize
           ? "Dish recipe finalized."
-          : data.unpriced?.length
-            ? `Draft saved. Set a cost for ${data.unpriced.join(", ")} on Stock before the food-cost percent means anything.`
-            : "Draft saved.",
+          : vars.keepFinal
+            ? "Changes saved. This dish stays finalized."
+            : data.unpriced?.length
+              ? `Draft saved. Set a cost for ${data.unpriced.join(", ")} on Stock before the food-cost percent means anything.`
+              : "Draft saved.",
       );
       if (vars.finalize) setOpenId(null);
     },
@@ -552,10 +556,14 @@ export default function RecipesPage() {
                           type="button"
                           disabled={save.isPending}
                           onClick={() =>
-                            save.mutate({ id: item.id, finalize: false })
+                            save.mutate({
+                              id: item.id,
+                              finalize: false,
+                              keepFinal: Boolean(item.chefSignedAt),
+                            })
                           }
                         >
-                          Save draft
+                          {item.chefSignedAt ? "Save changes" : "Save draft"}
                         </Button>
                         <Button
                           size="sm"

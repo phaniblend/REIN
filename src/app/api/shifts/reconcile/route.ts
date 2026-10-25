@@ -1,10 +1,11 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { locations, restaurants, shiftCounts } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { computeAvT } from "@/lib/avt";
+import { countWindowStart } from "@/lib/count-window";
 import { posCoverage } from "@/lib/pos-sync";
 import { binsFor, ensureLocationBins, setBin } from "@/lib/active-location";
 import { num } from "@/lib/utils";
@@ -34,7 +35,13 @@ export async function POST(request: Request) {
     if (!restaurant) return jsonError("Restaurant not found", 404);
 
     const threshold = num(restaurant.varianceThresholdPercent, 5);
-    const since = new Date(Date.now() - body.sinceHours * 60 * 60 * 1000);
+    const [lastClose] = await db
+      .select({
+        closedAt: sql<Date | null>`max(${shiftCounts.createdAt})`,
+      })
+      .from(shiftCounts)
+      .where(eq(shiftCounts.restaurantId, session.restaurantId));
+    const since = countWindowStart(lastClose?.closedAt, Date.now(), body.sinceHours);
     const location = await ensureLocationBins(session.restaurantId);
     const [first] = await db
       .select()

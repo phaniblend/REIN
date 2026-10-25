@@ -202,7 +202,9 @@ export default function DashboardPage() {
         message={
           low.length === 0
             ? "All tracked items at par."
-            : `${low.length} ingredient${low.length === 1 ? "" : "s"} need a plan before next service.`
+            : low.length === 1
+              ? "1 ingredient needs a plan before next service."
+              : `${low.length} ingredients need a plan before next service.`
         }
         count={low.length}
       />

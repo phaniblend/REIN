@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 export default async function SafetyPrintPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+  if (session.role !== "OWNER") redirect("/dashboard");
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const [restaurant] = await db
     .select()

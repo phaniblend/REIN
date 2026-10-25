@@ -26,8 +26,8 @@ const draftSchema = z.object({
 export async function GET() {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF", "STOCK_CLERK"].includes(session.role)) {
-    return jsonError("Forbidden", 403);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can see purchase orders", 403);
   }
   const location = await ensureLocationBins(session.restaurantId);
   const suggestions = await suggestPurchaseLines(
@@ -49,8 +49,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF", "STOCK_CLERK"].includes(session.role)) {
-    return jsonError("You can't draft a purchase order", 403);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can draft a purchase order", 403);
   }
   try {
     const body = draftSchema.parse(await readJson(request));

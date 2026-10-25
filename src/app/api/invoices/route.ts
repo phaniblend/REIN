@@ -21,8 +21,8 @@ const schema = z
 export async function GET() {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF", "STOCK_CLERK"].includes(session.role)) {
-    return jsonError("Forbidden", 403);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can see invoices", 403);
   }
 
   const rows = await db
@@ -44,8 +44,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF", "STOCK_CLERK"].includes(session.role)) {
-    return jsonError("You can't scan invoices", 403);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can scan invoices", 403);
   }
 
   try {

@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   ingredients,
@@ -62,7 +62,7 @@ export async function computeAvT(params: {
 
   const receiptWhere = [
     eq(stockReceipts.restaurantId, params.restaurantId),
-    gte(stockReceipts.receivedAt, since),
+    gt(stockReceipts.receivedAt, since),
     inArray(stockReceipts.ingredientId, ingredientIds),
   ];
   if (params.locationId) {
@@ -86,7 +86,7 @@ export async function computeAvT(params: {
 
   const wasteWhere = [
     eq(wastageLogs.restaurantId, params.restaurantId),
-    gte(wastageLogs.createdAt, since),
+    gt(wastageLogs.createdAt, since),
     inArray(wastageLogs.ingredientId, ingredientIds),
   ];
   if (params.locationId) {
@@ -124,7 +124,7 @@ export async function computeAvT(params: {
       and(
         eq(orders.restaurantId, params.restaurantId),
         eq(orders.source, "restman"),
-        gte(orders.createdAt, since),
+        gt(orders.createdAt, since),
         inArray(orderItems.status, ["SERVED", "PREPARING", "RETURNED"]),
         inArray(recipeBoms.ingredientId, ingredientIds),
       ),

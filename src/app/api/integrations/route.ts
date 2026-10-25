@@ -15,6 +15,9 @@ import { connectors, syncStaleConnections } from "@/lib/connectors";
 export async function GET() {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can see the register connection", 403);
+  }
 
   await syncStaleConnections(session.restaurantId);
 
@@ -101,13 +104,13 @@ const schema = z.discriminatedUnion("action", [
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can see the register connection", 403);
+  }
 
   try {
     const body = schema.parse(await readJson(request));
     if (body.action === "suggest") {
-      if (!["OWNER", "CHEF"].includes(session.role)) {
-        return jsonError("Only the owner or chef can suggest a mapping", 403);
-      }
       const [item] = await db
         .select({ id: posItems.id })
         .from(posItems)

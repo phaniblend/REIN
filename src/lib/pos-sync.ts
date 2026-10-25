@@ -1,4 +1,4 @@
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import {
   ingredients,
@@ -240,7 +240,7 @@ export async function theoreticalFromPos(restaurantId: string, since: Date) {
     .where(
       and(
         eq(integrationConnections.restaurantId, restaurantId),
-        gte(posSaleLines.soldAt, since),
+        gt(posSaleLines.soldAt, since),
       ),
     );
   const usage: Record<string, number> = {};
@@ -303,7 +303,7 @@ export async function posCoverage(restaurantId: string, since: Date) {
     .where(
       and(
         eq(integrationConnections.restaurantId, restaurantId),
-        gte(posSaleLines.soldAt, since),
+        gt(posSaleLines.soldAt, since),
       ),
     );
   const mappedIds = new Set(

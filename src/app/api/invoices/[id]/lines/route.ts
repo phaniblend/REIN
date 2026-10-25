@@ -16,8 +16,8 @@ export async function POST(
 ) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF", "STOCK_CLERK"].includes(session.role)) {
-    return jsonError("You can't edit invoice lines", 403);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can edit invoice lines", 403);
   }
   const { id } = await context.params;
   const body = schema.parse(await readJson(request));

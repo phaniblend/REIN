@@ -46,22 +46,22 @@ const allLinks: NavLink[] = [
     roles: ["CHEF"],
   },
   { href: "/team", label: "Team", icon: Users, roles: ["OWNER"] },
-  { href: "/integrations", label: "Connect", icon: Plug, roles: ["OWNER", "CHEF"] },
+  { href: "/integrations", label: "Connect", icon: Plug, roles: ["OWNER"] },
   {
     href: "/invoices",
     label: "Invoices",
     icon: FileText,
-    roles: ["OWNER", "CHEF", "STOCK_CLERK"],
+    roles: ["OWNER"],
   },
   {
     href: "/purchasing",
     label: "Buy",
     icon: ShoppingCart,
-    roles: ["OWNER", "CHEF", "STOCK_CLERK"],
+    roles: ["OWNER"],
   },
-  { href: "/prep", label: "Prep", icon: ClipboardList, roles: ["OWNER", "CHEF"] },
+  { href: "/prep", label: "Prep", icon: ClipboardList, roles: ["OWNER"] },
   { href: "/schedule", label: "Labor", icon: CalendarClock, roles: ["OWNER"] },
-  { href: "/safety", label: "Safety", icon: Thermometer },
+  { href: "/safety", label: "Safety", icon: Thermometer, roles: ["OWNER"] },
   { href: "/places", label: "Places", icon: Building2, roles: ["OWNER"] },
   { href: "/inventory", label: "Stock", icon: Package },
   {
@@ -109,10 +109,19 @@ export function AppShell({
   const navRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const active = navRef.current?.querySelector<HTMLAnchorElement>(
-      "[data-active='true']",
-    );
-    active?.scrollIntoView({ inline: "center", block: "nearest" });
+    const root = navRef.current;
+    if (!root) return;
+    const frame = requestAnimationFrame(() => {
+      const active = root.querySelector<HTMLAnchorElement>("[data-active='true']");
+      if (!active) return;
+      const left =
+        active.getBoundingClientRect().left -
+        root.getBoundingClientRect().left +
+        root.scrollLeft -
+        (root.clientWidth - active.offsetWidth) / 2;
+      root.scrollTo({ left: Math.max(0, left) });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [pathname, role]);
 
   const links = allLinks.filter((l) => !l.roles || l.roles.includes(role));

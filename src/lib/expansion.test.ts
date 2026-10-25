@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { cogsCents } from "./cogs";
 import { parseInvoiceText } from "./invoice-text";
+import { countWindowStart } from "./count-window";
 import { convertQty, matchConfidence, sameDish } from "./units";
 
 describe("units", () => {
@@ -32,6 +33,15 @@ describe("invoices", () => {
     assert.equal(lines[0]?.unit, "KG");
     assert.equal(lines[0]?.unitPrice, 1.5);
     assert.ok((lines[1]?.confidence ?? 1) < 0.7);
+  });
+});
+
+describe("counts", () => {
+  it("starts the next count after the previous close", () => {
+    const closed = new Date("2026-10-25T18:00:00.000Z");
+    assert.equal(countWindowStart(closed).toISOString(), closed.toISOString());
+    const first = countWindowStart(null, Date.parse("2026-10-25T18:00:00.000Z"), 16);
+    assert.equal(first.toISOString(), "2026-10-25T02:00:00.000Z");
   });
 });
 

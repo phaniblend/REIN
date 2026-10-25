@@ -10,6 +10,7 @@ export async function GET(
 ) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
+  if (session.role !== "OWNER") return jsonError("Only the owner can see invoices", 403);
   const { id } = await context.params;
   const [invoice] = await db
     .select()

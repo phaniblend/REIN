@@ -12,6 +12,16 @@ function menuRank(item) {
   return rank;
 }
 
+function dishIdentity(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\b(classic|traditional|homemade|original|house)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function dedupeMenu(sql, restaurantId) {
   const items = await sql`
     select id, name, menu_approval_status, chef_signed_at, is_active, created_at
@@ -21,7 +31,7 @@ async function dedupeMenu(sql, restaurantId) {
   `;
   const groups = new Map();
   for (const item of items) {
-    const key = String(item.name ?? "").trim().toLowerCase();
+    const key = dishIdentity(item.name);
     if (!key) continue;
     const list = groups.get(key) ?? [];
     list.push(item);
@@ -52,6 +62,11 @@ async function dedupeMenu(sql, restaurantId) {
       update order_items
       set menu_item_id = ${keeper.id}
       where menu_item_id in ${sql(losers)}
+    `;
+    await sql`
+      update pos_item_mappings
+      set dish_id = ${keeper.id}
+      where dish_id in ${sql(losers)}
     `;
     await sql`delete from menu_items where id in ${sql(losers)}`;
     removed += losers.length;

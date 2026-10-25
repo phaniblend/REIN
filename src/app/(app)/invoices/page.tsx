@@ -54,8 +54,7 @@ export default function InvoicesPage() {
       return data as { user: { role: string } };
     },
   });
-  const canConfirm =
-    me.data?.user?.role === "OWNER" || me.data?.user?.role === "STOCK_CLERK";
+  const canConfirm = me.data?.user?.role === "OWNER";
 
   const list = useQuery({
     queryKey: ["invoices"],

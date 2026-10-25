@@ -9,6 +9,7 @@ import { activeLocation } from "@/lib/active-location";
 export async function GET() {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
+  if (session.role !== "OWNER") return jsonError("Only the owner can see food safety", 403);
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const rows = await db
     .select({
@@ -42,6 +43,7 @@ const schema = z.object({
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
+  if (session.role !== "OWNER") return jsonError("Only the owner can log food safety", 403);
   const body = schema.parse(await readJson(request));
   const location = await activeLocation(session.restaurantId);
   const [log] = await db

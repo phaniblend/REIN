@@ -1,7 +1,7 @@
 /**
  * One-shot removal of the live QA leftovers:
- * pending dishes, QA Garlic, QA Chickpeas, Test Onion,
- * and the Table 7 / Table 12 tickets.
+ * pending dishes, QA Garlic, QA Chickpeas, Test Onion.
+ * Open tickets are left in place.
  * Finalized menu dishes are left in place.
  */
 const postgres = require("postgres");
@@ -22,11 +22,6 @@ async function cleanup(sql) {
     where menu_approval_status in ('PENDING_APPROVAL', 'DRAFT')
   `;
 
-  const tickets = await sql`
-    delete from orders
-    where lower(trim(table_number)) in ('7', '12', 'table 7', 'table 12')
-  `;
-
   const ingredients = await sql`
     select id, name from ingredients
     where lower(trim(name)) in ${sql(INGREDIENT_NAMES)}
@@ -41,7 +36,7 @@ async function cleanup(sql) {
   }
 
   console.log(
-    `→ removed ${dishes.count ?? 0} pending dish(es), ${tickets.count ?? 0} test ticket(s), ${ingredientIds.length} test ingredient(s)`,
+    `→ removed ${dishes.count ?? 0} pending dish(es), ${ingredientIds.length} test ingredient(s)`,
   );
   void pending;
 }

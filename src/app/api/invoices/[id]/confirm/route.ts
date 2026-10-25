@@ -21,8 +21,8 @@ export async function POST(
 ) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "STOCK_CLERK"].includes(session.role)) {
-    return jsonError("Only the owner or stock clerk can confirm an invoice", 403);
+  if (session.role !== "OWNER") {
+    return jsonError("Only the owner can confirm an invoice", 403);
   }
 
   const { id } = await context.params;
