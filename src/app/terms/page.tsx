@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: { absolute: "Terms of Service" },
+  description:
+    "Terms of Service for Restman, registered brand My Starter Profile, including SMS terms.",
+};
 
 export default function TermsPage() {
   return (

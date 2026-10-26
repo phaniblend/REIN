@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: { absolute: "Privacy Policy" },
+  description:
+    "Privacy Policy for Restman, registered brand My Starter Profile. We do not sell or share SMS opt-in data.",
+};
 
 export default function PrivacyPage() {
   return (
