@@ -197,13 +197,16 @@ export default function RegisterPage() {
                 required
               />
               <span>
-                I agree to the{" "}
-                <Link href="/terms" className="underline">
-                  terms
+                I agree to receive text messages from Restman, registered brand
+                My Starter Profile, including one-time sign-in codes. Message
+                frequency varies. Message and data rates may apply. Reply STOP
+                to opt out and HELP for help. See the{" "}
+                <Link href="https://www.restman.live/terms" className="underline">
+                  Terms of Service
                 </Link>{" "}
                 and{" "}
-                <Link href="/privacy" className="underline">
-                  privacy policy
+                <Link href="https://www.restman.live/privacy" className="underline">
+                  Privacy Policy
                 </Link>
                 .
               </span>
