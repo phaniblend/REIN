@@ -71,6 +71,10 @@ export const returnReasonEnum = pgEnum("return_reason", [
 ]);
 export const wastageKindEnum = pgEnum("wastage_kind", [
   "KITCHEN_SPOILED",
+  "PREP_ERROR",
+  "DROPPED",
+  "OVERCOOKED",
+  "EXPIRED",
   "POS_RETURNED_WASTE",
   "POS_RETURNED_REUSED",
 ]);
@@ -338,6 +342,14 @@ export const wastageLogs = pgTable(
       .references(() => users.id)
       .notNull(),
     quantity: numeric("quantity", { precision: 10, scale: 3 }).notNull(),
+    /** Cost per unit when the waste was logged, so the dollar loss stays fixed. */
+    unitCost: numeric("unit_cost", { precision: 10, scale: 2 })
+      .default("0.00")
+      .notNull(),
+    /** Quantity above on-hand that could not be deducted from stock. */
+    shortfall: numeric("shortfall", { precision: 10, scale: 3 })
+      .default("0.000")
+      .notNull(),
     kind: wastageKindEnum("kind").default("KITCHEN_SPOILED").notNull(),
     reason: text("reason").notNull(),
     locationId: uuid("location_id").references(() => locations.id, {

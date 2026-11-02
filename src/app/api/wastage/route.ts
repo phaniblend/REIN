@@ -1,18 +1,20 @@
 import { z } from "zod";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { ingredients, wastageLogs } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
-import { activeLocation, bumpBin } from "@/lib/active-location";
-import { and } from "drizzle-orm";
+import { binsFor, bumpBin, ensureLocationBins } from "@/lib/active-location";
+import { num } from "@/lib/utils";
+import {
+  WASTAGE_KINDS,
+  wasteDeductsStock,
+} from "@/lib/wastage";
 
 const schema = z.object({
   ingredientId: z.string().uuid(),
   quantity: z.number().positive(),
-  kind: z
-    .enum(["KITCHEN_SPOILED", "POS_RETURNED_WASTE", "POS_RETURNED_REUSED"])
-    .default("KITCHEN_SPOILED"),
+  kind: z.enum(WASTAGE_KINDS).default("KITCHEN_SPOILED"),
   reason: z.string().min(2),
 });
 
@@ -25,7 +27,10 @@ export async function GET() {
       id: wastageLogs.id,
       ingredientId: wastageLogs.ingredientId,
       ingredientName: ingredients.name,
+      unit: ingredients.unit,
       quantity: wastageLogs.quantity,
+      unitCost: wastageLogs.unitCost,
+      shortfall: wastageLogs.shortfall,
       kind: wastageLogs.kind,
       reason: wastageLogs.reason,
       createdAt: wastageLogs.createdAt,
@@ -36,7 +41,37 @@ export async function GET() {
     .orderBy(desc(wastageLogs.createdAt))
     .limit(50);
 
-  return jsonOk({ wastage: rows });
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const [week] = await db
+    .select({
+      loss: sql<string>`coalesce(sum(
+        case
+          when ${wastageLogs.kind} = 'POS_RETURNED_REUSED' then 0
+          else ${wastageLogs.quantity}::numeric * ${wastageLogs.unitCost}::numeric
+        end
+      ), 0)`,
+    })
+    .from(wastageLogs)
+    .where(
+      and(
+        eq(wastageLogs.restaurantId, session.restaurantId),
+        gte(wastageLogs.createdAt, weekAgo),
+      ),
+    );
+
+  return jsonOk({
+    wastage: rows.map((row) => {
+      const quantity = num(row.quantity);
+      const unitCost = num(row.unitCost);
+      const loss =
+        row.kind === "POS_RETURNED_REUSED" ? 0 : quantity * unitCost;
+      return {
+        ...row,
+        loss: loss.toFixed(2),
+      };
+    }),
+    weekLoss: num(week?.loss).toFixed(2),
+  });
 }
 
 export async function POST(request: Request) {
@@ -60,7 +95,13 @@ export async function POST(request: Request) {
       .limit(1);
     if (!ing) return jsonError("Ingredient not found", 404);
 
-    const location = await activeLocation(session.restaurantId);
+    const location = await ensureLocationBins(session.restaurantId);
+    const bins = await binsFor(location.id);
+    const onHand = bins.get(ing.id) ?? num(ing.currentStock);
+    const deducts = wasteDeductsStock(body.kind);
+    const shortfall = deducts ? Math.max(0, body.quantity - onHand) : 0;
+    const deductQty = deducts ? body.quantity - shortfall : 0;
+
     const [log] = await db
       .insert(wastageLogs)
       .values({
@@ -68,17 +109,26 @@ export async function POST(request: Request) {
         ingredientId: body.ingredientId,
         loggedBy: session.id,
         quantity: body.quantity.toFixed(3),
+        unitCost: num(ing.costPerUnit).toFixed(2),
+        shortfall: shortfall.toFixed(3),
         kind: body.kind,
         reason: body.reason,
         locationId: location.id,
       })
       .returning();
 
-    if (body.kind !== "POS_RETURNED_REUSED") {
-      await bumpBin(location.id, ing.id, -body.quantity);
+    if (deductQty > 0) {
+      await bumpBin(location.id, ing.id, -deductQty);
     }
 
-    return jsonOk({ wastage: log }, { status: 201 });
+    return jsonOk(
+      {
+        wastage: log,
+        shortfall,
+        warned: shortfall > 0,
+      },
+      { status: 201 },
+    );
   } catch (err) {
     if (err instanceof z.ZodError) {
       return jsonError(err.issues[0]?.message ?? "Invalid input");

@@ -11,6 +11,7 @@ import {
 } from "@/db/schema";
 import { theoreticalFromPos } from "@/lib/pos-sync";
 import { num } from "@/lib/utils";
+import { isKitchenWasteKind } from "@/lib/wastage";
 
 export type IngredientAvT = {
   ingredientId: string;
@@ -105,7 +106,8 @@ export async function computeAvT(params: {
     .select({
       ingredientId: wastageLogs.ingredientId,
       kind: wastageLogs.kind,
-      qty: sql<string>`coalesce(sum(${wastageLogs.quantity}), 0)`,
+      // Only the amount that actually left stock — shortfall is flagged on the log.
+      qty: sql<string>`coalesce(sum(${wastageLogs.quantity}::numeric - ${wastageLogs.shortfall}::numeric), 0)`,
     })
     .from(wastageLogs)
     .where(and(...wasteWhere))
@@ -153,7 +155,7 @@ export async function computeAvT(params: {
   const returnedWaste: Record<string, number> = {};
   for (const row of wasteRows) {
     const q = num(row.qty);
-    if (row.kind === "KITCHEN_SPOILED") {
+    if (isKitchenWasteKind(row.kind)) {
       kitchenWaste[row.ingredientId] = (kitchenWaste[row.ingredientId] ?? 0) + q;
     } else if (row.kind === "POS_RETURNED_WASTE") {
       returnedWaste[row.ingredientId] = (returnedWaste[row.ingredientId] ?? 0) + q;

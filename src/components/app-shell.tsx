@@ -1,11 +1,12 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   Building2,
   CalendarClock,
   ClipboardList,
+  Ellipsis,
   FileText,
   LayoutDashboard,
   Plug,
@@ -108,12 +109,17 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const navRef = useRef<HTMLDivElement>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     const root = navRef.current;
     if (!root) return;
     const frame = requestAnimationFrame(() => {
-      const active = root.querySelector<HTMLAnchorElement>("[data-active='true']");
+      const active = root.querySelector<HTMLElement>("[data-active='true']");
       if (!active) return;
       const left =
         active.getBoundingClientRect().left -
@@ -130,6 +136,27 @@ export function AppShell({
     if (!showLaunchExtras() && LAUNCH_EXTRA_HREFS.includes(l.href)) return false;
     return true;
   });
+  const primaryLinks = links.filter((l) => !LAUNCH_EXTRA_HREFS.includes(l.href));
+  const moreLinks = links.filter((l) => LAUNCH_EXTRA_HREFS.includes(l.href));
+  const moreActive = moreLinks.some(
+    (l) => pathname === l.href || pathname.startsWith(`${l.href}/`),
+  );
+
+  function goTo(href: string, active: boolean, event: MouseEvent) {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    event.preventDefault();
+    setMoreOpen(false);
+    if (!active) router.push(href);
+  }
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -160,11 +187,34 @@ export function AppShell({
       <main className="flex-1 px-4 py-4">{children}</main>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-[var(--border)] bg-[color-mix(in_oklab,var(--bg)_92%,transparent)] backdrop-blur-md">
+        {moreOpen && moreLinks.length > 0 && (
+          <div className="mx-auto grid max-w-lg grid-cols-3 gap-1 border-b border-[var(--border)] px-2 py-2">
+            {moreLinks.map(({ href, label, icon: Icon }) => {
+              const active = pathname === href || pathname.startsWith(`${href}/`);
+              return (
+                <a
+                  key={`${href}-${label}`}
+                  href={href}
+                  className={cn(
+                    "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 text-[10px]",
+                    active
+                      ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                      : "text-[var(--muted)]",
+                  )}
+                  onClick={(event) => goTo(href, active, event)}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </a>
+              );
+            })}
+          </div>
+        )}
         <div
           ref={navRef}
-          className="mx-auto flex max-w-lg gap-0.5 overflow-x-auto px-1 py-1.5"
+          className="mx-auto flex max-w-lg justify-between gap-0.5 overflow-x-clip px-1 py-1.5"
         >
-          {links.map(({ href, label, icon: Icon }) => {
+          {primaryLinks.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
               <a
@@ -172,31 +222,36 @@ export function AppShell({
                 href={href}
                 data-active={active ? "true" : "false"}
                 className={cn(
-                  "flex min-h-12 min-w-14 shrink-0 flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 text-[10px]",
+                  "flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px]",
                   active
                     ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                     : "text-[var(--muted)]",
                 )}
-                onClick={(event) => {
-                  if (
-                    event.defaultPrevented ||
-                    event.button !== 0 ||
-                    event.metaKey ||
-                    event.ctrlKey ||
-                    event.shiftKey ||
-                    event.altKey
-                  ) {
-                    return;
-                  }
-                  event.preventDefault();
-                  if (!active) router.push(href);
-                }}
+                onClick={(event) => goTo(href, active, event)}
               >
                 <Icon className="h-4 w-4" />
                 {label}
               </a>
             );
           })}
+          {moreLinks.length > 0 && (
+            <button
+              type="button"
+              data-active={moreActive && !moreOpen ? "true" : "false"}
+              className={cn(
+                "flex min-h-12 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 py-1.5 text-[10px]",
+                moreOpen || moreActive
+                  ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "text-[var(--muted)]",
+              )}
+              aria-expanded={moreOpen}
+              aria-label="More pages"
+              onClick={() => setMoreOpen((open) => !open)}
+            >
+              <Ellipsis className="h-4 w-4" />
+              More
+            </button>
+          )}
         </div>
       </nav>
     </div>
