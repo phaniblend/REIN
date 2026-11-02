@@ -2,6 +2,7 @@ import { and, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
 import {
   alerts,
+  ingredients,
   integrationConnections,
   locations,
   posSaleLines,
@@ -13,6 +14,19 @@ import {
 import { dishFoodCosts } from "@/lib/food-cost";
 import { sendSms } from "@/lib/sms";
 import { num } from "@/lib/utils";
+
+function alertLabel(type: string, payload: string | null) {
+  let name = "";
+  try {
+    const parsed = payload ? (JSON.parse(payload) as { name?: string }) : null;
+    name = parsed?.name ? ` on ${parsed.name}` : "";
+  } catch {
+    name = "";
+  }
+  if (type === "price_change") return `price change${name}`;
+  if (type === "variance") return `count variance${name}`;
+  return type.replaceAll("_", " ") + name;
+}
 
 export async function buildDigest(restaurantId: string) {
   const [restaurant] = await db
@@ -60,8 +74,13 @@ export async function buildDigest(restaurantId: string) {
     .orderBy(desc(alerts.createdAt))
     .limit(5);
   const variances = await db
-    .select()
+    .select({
+      variance: shiftCounts.variance,
+      name: ingredients.name,
+      unit: ingredients.unit,
+    })
     .from(shiftCounts)
+    .innerJoin(ingredients, eq(ingredients.id, shiftCounts.ingredientId))
     .where(eq(shiftCounts.restaurantId, restaurantId))
     .orderBy(desc(shiftCounts.createdAt))
     .limit(3);
@@ -71,10 +90,15 @@ export async function buildDigest(restaurantId: string) {
     food === null ? "Food cost: no priced recipes yet" : `Food cost ${food.toFixed(0)}%`,
     `Waste logs today: ${waste.length}`,
     openAlerts.length
-      ? `Alerts: ${openAlerts.map((row) => row.type).join(", ")}`
+      ? `Alerts: ${openAlerts.map((row) => alertLabel(row.type, row.payload)).join("; ")}`
       : "No open alerts",
     variances.length
-      ? `Latest count variances: ${variances.map((row) => num(row.variance).toFixed(2)).join(", ")}`
+      ? `Latest count variances: ${variances
+          .map(
+            (row) =>
+              `${row.name} ${num(row.variance).toFixed(2)} ${row.unit}`,
+          )
+          .join("; ")}`
       : "No count yet today",
   ];
   return lines.join("\n");

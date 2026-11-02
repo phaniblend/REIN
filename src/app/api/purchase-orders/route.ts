@@ -34,6 +34,11 @@ export async function GET() {
     session.restaurantId,
     await binsFor(location.id),
   );
+  const stock = await db
+    .select({ parLevel: ingredients.parLevel })
+    .from(ingredients)
+    .where(eq(ingredients.restaurantId, session.restaurantId));
+  const hasPars = stock.some((row) => Number(row.parLevel ?? 0) > 0);
   const orders = await db
     .select()
     .from(purchaseOrders)
@@ -44,7 +49,7 @@ export async function GET() {
   const lines = orderIds.length
     ? await db.select().from(poLines).where(inArray(poLines.purchaseOrderId, orderIds))
     : [];
-  return jsonOk({ suggestions, orders, lines });
+  return jsonOk({ suggestions, orders, lines, hasPars });
 }
 
 export async function POST(request: Request) {

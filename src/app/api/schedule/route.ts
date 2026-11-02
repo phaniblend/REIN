@@ -10,6 +10,7 @@ import {
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { dishFoodCosts } from "@/lib/food-cost";
+import { activeLocation } from "@/lib/active-location";
 import { num } from "@/lib/utils";
 
 export async function GET() {
@@ -26,6 +27,7 @@ export async function GET() {
       startsAt: staffShifts.startsAt,
       endsAt: staffShifts.endsAt,
       hourlyRateCents: staffShifts.hourlyRateCents,
+      locationId: staffShifts.locationId,
     })
     .from(staffShifts)
     .innerJoin(users, eq(staffShifts.userId, users.id))
@@ -72,14 +74,15 @@ export async function GET() {
     salesCents,
     foodPercent,
     laborPercent,
-    primePercent: foodPercent + laborPercent,
+    primePercent: salesCents > 0 ? foodPercent + laborPercent : 0,
+    hasSales: salesCents > 0,
   });
 }
 
 const schema = z.object({
   userId: z.string().uuid(),
-  startsAt: z.string(),
-  endsAt: z.string(),
+  startsAt: z.string().min(1),
+  endsAt: z.string().min(1),
   hourlyRate: z.number().nonnegative(),
 });
 
@@ -87,25 +90,117 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
   if (session.role !== "OWNER") return jsonError("Only the owner can schedule staff", 403);
-  const body = schema.parse(await readJson(request));
-  const startsAt = new Date(body.startsAt);
-  const endsAt = new Date(body.endsAt);
-  if (!(endsAt > startsAt)) return jsonError("End time has to be after the start", 400);
-  const [person] = await db
-    .select()
-    .from(users)
-    .where(and(eq(users.id, body.userId), eq(users.restaurantId, session.restaurantId)))
-    .limit(1);
-  if (!person) return jsonError("Staff member not found", 404);
-  const [shift] = await db
-    .insert(staffShifts)
-    .values({
-      restaurantId: session.restaurantId,
-      userId: person.id,
-      startsAt,
-      endsAt,
-      hourlyRateCents: String(Math.round(body.hourlyRate * 100)),
-    })
-    .returning();
-  return jsonOk({ shift }, { status: 201 });
+  try {
+    const body = schema.parse(await readJson(request));
+    const startsAt = new Date(body.startsAt);
+    const endsAt = new Date(body.endsAt);
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      return jsonError("Enter a valid start and end time", 400);
+    }
+    if (!(endsAt > startsAt)) return jsonError("End time has to be after the start", 400);
+    const [person] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, body.userId), eq(users.restaurantId, session.restaurantId)))
+      .limit(1);
+    if (!person) return jsonError("Staff member not found", 404);
+    const location = await activeLocation(session.restaurantId);
+    const [shift] = await db
+      .insert(staffShifts)
+      .values({
+        restaurantId: session.restaurantId,
+        locationId: location.id,
+        userId: person.id,
+        startsAt,
+        endsAt,
+        hourlyRateCents: String(Math.round(body.hourlyRate * 100)),
+      })
+      .returning();
+    return jsonOk({ shift }, { status: 201 });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return jsonError(err.issues[0]?.message ?? "Invalid input", 400);
+    }
+    console.error(err);
+    return jsonError("Could not save the shift", 500);
+  }
+}
+
+export async function DELETE(request: Request) {
+  const session = await getSession();
+  if (!session) return jsonError("Unauthorized", 401);
+  if (session.role !== "OWNER") return jsonError("Only the owner can change the schedule", 403);
+  try {
+    const body = z
+      .object({ id: z.string().uuid() })
+      .parse(await readJson(request));
+    const [shift] = await db
+      .select()
+      .from(staffShifts)
+      .where(
+        and(
+          eq(staffShifts.id, body.id),
+          eq(staffShifts.restaurantId, session.restaurantId),
+        ),
+      )
+      .limit(1);
+    if (!shift) return jsonError("Shift not found", 404);
+    await db.delete(staffShifts).where(eq(staffShifts.id, shift.id));
+    return jsonOk({ deleted: true });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return jsonError(err.issues[0]?.message ?? "Invalid input", 400);
+    }
+    console.error(err);
+    return jsonError("Could not delete the shift", 500);
+  }
+}
+
+export async function PATCH(request: Request) {
+  const session = await getSession();
+  if (!session) return jsonError("Unauthorized", 401);
+  if (session.role !== "OWNER") return jsonError("Only the owner can change the schedule", 403);
+  try {
+    const body = z
+      .object({
+        id: z.string().uuid(),
+        startsAt: z.string().min(1),
+        endsAt: z.string().min(1),
+        hourlyRate: z.number().nonnegative(),
+      })
+      .parse(await readJson(request));
+    const startsAt = new Date(body.startsAt);
+    const endsAt = new Date(body.endsAt);
+    if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+      return jsonError("Enter a valid start and end time", 400);
+    }
+    if (!(endsAt > startsAt)) return jsonError("End time has to be after the start", 400);
+    const [shift] = await db
+      .select()
+      .from(staffShifts)
+      .where(
+        and(
+          eq(staffShifts.id, body.id),
+          eq(staffShifts.restaurantId, session.restaurantId),
+        ),
+      )
+      .limit(1);
+    if (!shift) return jsonError("Shift not found", 404);
+    const [updated] = await db
+      .update(staffShifts)
+      .set({
+        startsAt,
+        endsAt,
+        hourlyRateCents: String(Math.round(body.hourlyRate * 100)),
+      })
+      .where(eq(staffShifts.id, shift.id))
+      .returning();
+    return jsonOk({ shift: updated });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return jsonError(err.issues[0]?.message ?? "Invalid input", 400);
+    }
+    console.error(err);
+    return jsonError("Could not update the shift", 500);
+  }
 }

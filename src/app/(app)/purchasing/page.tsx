@@ -60,6 +60,7 @@ export default function PurchasingPage() {
         suggestions: Line[];
         orders: Order[];
         lines: PoLine[];
+        hasPars: boolean;
       };
     },
   });
@@ -132,7 +133,9 @@ export default function PurchasingPage() {
         <CardTitle>Suggested</CardTitle>
         {suggestions.length === 0 ? (
           <p className="text-sm text-[var(--muted)]">
-            Nothing is below par. Set a par on stock items to see suggestions.
+            {data.data?.hasPars
+              ? "Everything with a par is covered for now."
+              : "Set a par on stock items to see suggestions."}
           </p>
         ) : (
           <ul className="space-y-2 text-sm">
