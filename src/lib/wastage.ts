@@ -10,6 +10,12 @@ export const WASTAGE_KINDS = [
 
 export type WastageKind = (typeof WASTAGE_KINDS)[number];
 
+/** Waiters only log POS returns — kitchen spoil is chef/stock/owner work. */
+export const WAITER_WASTAGE_KINDS = [
+  "POS_RETURNED_WASTE",
+  "POS_RETURNED_REUSED",
+] as const satisfies readonly WastageKind[];
+
 export function wasteKindLabel(kind: string) {
   switch (kind) {
     case "KITCHEN_SPOILED":
@@ -45,4 +51,29 @@ export function isKitchenWasteKind(kind: string) {
     kind === "OVERCOOKED" ||
     kind === "EXPIRED"
   );
+}
+
+export function wastageKindsForRole(role: string): readonly WastageKind[] {
+  if (role === "WAITER") return WAITER_WASTAGE_KINDS;
+  return WASTAGE_KINDS;
+}
+
+export function canLogWastageKind(role: string, kind: string) {
+  return (wastageKindsForRole(role) as readonly string[]).includes(kind);
+}
+
+/**
+ * Dollar loss from stock actually removed. null when cost was never recorded
+ * (older rows before unitCost was saved).
+ */
+export function wasteLossAmount(opts: {
+  quantity: number;
+  shortfall: number;
+  unitCost: number;
+  kind: string;
+}): number | null {
+  if (opts.kind === "POS_RETURNED_REUSED") return 0;
+  if (!(opts.unitCost > 0)) return null;
+  const removed = Math.max(0, opts.quantity - Math.max(0, opts.shortfall));
+  return removed * opts.unitCost;
 }

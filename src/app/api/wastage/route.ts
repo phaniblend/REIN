@@ -8,7 +8,9 @@ import { binsFor, bumpBin, ensureLocationBins } from "@/lib/active-location";
 import { num } from "@/lib/utils";
 import {
   WASTAGE_KINDS,
+  canLogWastageKind,
   wasteDeductsStock,
+  wasteLossAmount,
 } from "@/lib/wastage";
 
 const schema = z.object({
@@ -47,7 +49,9 @@ export async function GET() {
       loss: sql<string>`coalesce(sum(
         case
           when ${wastageLogs.kind} = 'POS_RETURNED_REUSED' then 0
-          else ${wastageLogs.quantity}::numeric * ${wastageLogs.unitCost}::numeric
+          when ${wastageLogs.unitCost}::numeric <= 0 then 0
+          else greatest(0, ${wastageLogs.quantity}::numeric - ${wastageLogs.shortfall}::numeric)
+            * ${wastageLogs.unitCost}::numeric
         end
       ), 0)`,
     })
@@ -61,13 +65,15 @@ export async function GET() {
 
   return jsonOk({
     wastage: rows.map((row) => {
-      const quantity = num(row.quantity);
-      const unitCost = num(row.unitCost);
-      const loss =
-        row.kind === "POS_RETURNED_REUSED" ? 0 : quantity * unitCost;
+      const loss = wasteLossAmount({
+        quantity: num(row.quantity),
+        shortfall: num(row.shortfall),
+        unitCost: num(row.unitCost),
+        kind: row.kind,
+      });
       return {
         ...row,
-        loss: loss.toFixed(2),
+        loss: loss === null ? null : loss.toFixed(2),
       };
     }),
     weekLoss: num(week?.loss).toFixed(2),
@@ -77,12 +83,21 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (!["OWNER", "CHEF", "STOCK_CLERK"].includes(session.role)) {
+  if (!["OWNER", "CHEF", "STOCK_CLERK", "WAITER"].includes(session.role)) {
     return jsonError("Forbidden", 403);
   }
 
   try {
     const body = schema.parse(await readJson(request));
+    if (!canLogWastageKind(session.role, body.kind)) {
+      return jsonError(
+        session.role === "WAITER"
+          ? "Waiters can only log returned waste"
+          : "Forbidden",
+        403,
+      );
+    }
+
     const [ing] = await db
       .select()
       .from(ingredients)

@@ -30,13 +30,18 @@ export async function GET() {
     .where(eq(ingredients.restaurantId, session.restaurantId))
     .orderBy(asc(ingredients.name));
 
+  const showCost = session.role === "OWNER";
   return jsonOk({
     locationId: location.id,
     locationName: location.name,
-    ingredients: rows.map((row) => ({
-      ...row,
-      currentStock: (bins.get(row.id) ?? num(row.currentStock)).toFixed(3),
-    })),
+    ingredients: rows.map((row) => {
+      const { costPerUnit, ...rest } = row;
+      return {
+        ...rest,
+        ...(showCost ? { costPerUnit } : {}),
+        currentStock: (bins.get(row.id) ?? num(row.currentStock)).toFixed(3),
+      };
+    }),
   });
 }
 

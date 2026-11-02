@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,13 +13,14 @@ import {
   WASTAGE_KINDS,
   wasteDeductsStock,
   wasteKindLabel,
+  wastageKindsForRole,
 } from "@/lib/wastage";
 
 type Ingredient = {
   id: string;
   name: string;
   unit: string;
-  costPerUnit: string;
+  costPerUnit?: string;
   currentStock: string;
 };
 
@@ -30,7 +31,7 @@ type WasteRow = {
   quantity: string;
   unitCost: string;
   shortfall: string;
-  loss: string;
+  loss: string | null;
   kind: string;
   reason: string;
   createdAt: string;
@@ -46,6 +47,26 @@ export default function WastagePage() {
   });
   const [qtyError, setQtyError] = useState<string | null>(null);
 
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unauthorized");
+      return data as { user: { role: string } };
+    },
+  });
+  const role = me.data?.user?.role ?? "";
+  const kindOptions = role ? wastageKindsForRole(role) : WASTAGE_KINDS;
+
+  useEffect(() => {
+    if (!role) return;
+    const allowed = wastageKindsForRole(role);
+    if (!(allowed as readonly string[]).includes(form.kind)) {
+      setForm((f) => ({ ...f, kind: allowed[0]! }));
+    }
+  }, [role, form.kind]);
+
   const ingredients = useQuery({
     queryKey: ["ingredients"],
     queryFn: async () => {
@@ -58,7 +79,10 @@ export default function WastagePage() {
     queryKey: ["wastage"],
     queryFn: async () => {
       const res = await fetch("/api/wastage");
-      return res.json() as Promise<{ wastage: WasteRow[]; weekLoss: string }>;
+      return res.json() as Promise<{
+        wastage: WasteRow[];
+        weekLoss: string;
+      }>;
     },
   });
 
@@ -77,6 +101,15 @@ export default function WastagePage() {
     wasteDeductsStock(form.kind) &&
     Number.isFinite(qty) &&
     qty > onHand;
+  const unitCost = selected?.costPerUnit;
+  const previewLoss =
+    selected &&
+    unitCost !== undefined &&
+    Number.isFinite(qty) &&
+    qty > 0 &&
+    !qtyError
+      ? Math.max(0, qty - (overStock ? qty - onHand : 0)) * num(unitCost)
+      : null;
 
   function validateQuantity(raw: string) {
     if (!raw.trim()) {
@@ -126,8 +159,9 @@ export default function WastagePage() {
           Wastage log
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Categorize spoil / return waste so it is excluded from unaccounted
-          loss.
+          {role === "WAITER"
+            ? "Log returned dishes so kitchen stock stays honest."
+            : "Categorize spoil / return waste so it is excluded from unaccounted loss."}
         </p>
       </div>
 
@@ -165,7 +199,7 @@ export default function WastagePage() {
             value={form.kind}
             onChange={(e) => setForm({ ...form, kind: e.target.value })}
           >
-            {WASTAGE_KINDS.map((kind) => (
+            {kindOptions.map((kind) => (
               <option key={kind} value={kind}>
                 {wasteKindLabel(kind)}
               </option>
@@ -209,10 +243,10 @@ export default function WastagePage() {
               shortfall for the next count.
             </p>
           )}
-          {selected && Number.isFinite(qty) && qty > 0 && !qtyError && (
+          {previewLoss !== null && num(unitCost) > 0 && (
             <p className="mt-1 text-xs text-[var(--muted)]">
-              About {money(qty * num(selected.costPerUnit))} at{" "}
-              {money(selected.costPerUnit)}/{selected.unit}
+              About {money(previewLoss)} at {money(unitCost!)}/{selected?.unit}
+              {overStock ? " on the stock that is on hand" : ""}
             </p>
           )}
         </div>
@@ -257,7 +291,9 @@ export default function WastagePage() {
             <p className="text-sm">
               {row.kind === "POS_RETURNED_REUSED"
                 ? "No stock loss"
-                : `Loss ${money(row.loss)}`}
+                : row.loss === null
+                  ? "Loss —"
+                  : `Loss ${money(row.loss)}`}
               {num(row.shortfall) > 0
                 ? ` · shortfall ${num(row.shortfall).toFixed(3)} ${row.unit}`
                 : ""}
