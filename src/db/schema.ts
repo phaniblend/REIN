@@ -211,7 +211,7 @@ export const ingredients = pgTable(
     /** Empty means the stock unit is the base unit. */
     baseUnit: text("base_unit").default("").notNull(),
     allergens: text("allergens").default("").notNull(),
-    costPerUnit: numeric("cost_per_unit", { precision: 10, scale: 2 }).notNull(),
+    costPerUnit: numeric("cost_per_unit", { precision: 14, scale: 6 }).notNull(),
     currentStock: numeric("current_stock", { precision: 12, scale: 3 })
       .default("0.000")
       .notNull(),
@@ -281,7 +281,7 @@ export const stockReceipts = pgTable(
       .references(() => users.id)
       .notNull(),
     quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull(),
-    unitCost: numeric("unit_cost", { precision: 10, scale: 2 }).notNull(),
+    unitCost: numeric("unit_cost", { precision: 14, scale: 6 }).notNull(),
     supplierNote: text("supplier_note"),
     locationId: uuid("location_id").references(() => locations.id, {
       onDelete: "set null",
@@ -343,8 +343,8 @@ export const wastageLogs = pgTable(
       .notNull(),
     quantity: numeric("quantity", { precision: 10, scale: 3 }).notNull(),
     /** Cost per unit when the waste was logged, so the dollar loss stays fixed. */
-    unitCost: numeric("unit_cost", { precision: 10, scale: 2 })
-      .default("0.00")
+    unitCost: numeric("unit_cost", { precision: 14, scale: 6 })
+      .default("0.000000")
       .notNull(),
     /** Quantity above on-hand that could not be deducted from stock. */
     shortfall: numeric("shortfall", { precision: 10, scale: 3 })
@@ -545,9 +545,12 @@ export const invoiceLines = pgTable("invoice_lines", {
   rawText: text("raw_text").notNull(),
   ingredientId: uuid("ingredient_id").references(() => ingredients.id),
   qty: numeric("qty", { precision: 12, scale: 3 }).notNull(),
+  /** Invoice unit for this line (converted to the stock unit on confirm). */
+  unit: text("unit").default("").notNull(),
+  /** Dollars × 100; fractional cents allowed so $0.0016/G is not rounded to 0. */
   unitPriceCents: numeric("unit_price_cents", {
-    precision: 12,
-    scale: 0,
+    precision: 14,
+    scale: 4,
   }).notNull(),
   confidence: numeric("confidence", { precision: 4, scale: 3 }).notNull(),
 });
@@ -561,8 +564,8 @@ export const priceHistory = pgTable(
       .notNull(),
     supplierName: text("supplier_name"),
     unitPriceCents: numeric("unit_price_cents", {
-      precision: 12,
-      scale: 0,
+      precision: 14,
+      scale: 4,
     }).notNull(),
     observedAt: timestamp("observed_at").defaultNow().notNull(),
   },

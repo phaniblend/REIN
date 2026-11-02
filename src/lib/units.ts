@@ -9,6 +9,31 @@ export function convertQty(qty: number, from: string, to: string): number | null
   return null;
 }
 
+/** Pull KG/G/L/ML/PIECE/PACKET out of an invoice raw line when the unit column is empty. */
+export function unitFromInvoiceText(raw: string) {
+  const match = raw.match(
+    /\b\d+(?:\.\d+)?\s+(KG|G|L|ML|PIECE|PACKET)\b/i,
+  );
+  return match ? match[1]!.toUpperCase() : "";
+}
+
+/**
+ * Convert invoice qty + unit price into the stock item's unit.
+ * Price is dollars per invoice unit; result cost is dollars per stock unit.
+ */
+export function convertInvoiceToStock(opts: {
+  qty: number;
+  unitPrice: number;
+  fromUnit: string;
+  toUnit: string;
+}): { qty: number; unitCost: number } | null {
+  const from = opts.fromUnit || opts.toUnit;
+  const qty = convertQty(opts.qty, from, opts.toUnit);
+  if (qty === null || qty <= 0) return null;
+  const total = opts.qty * opts.unitPrice;
+  return { qty, unitCost: total / qty };
+}
+
 export function normalizeName(value: string) {
   return value
     .toLowerCase()

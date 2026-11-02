@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { ingredients, stockReceipts } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
-import { num } from "@/lib/utils";
+import { formatUnitCost, num } from "@/lib/utils";
 import { activeLocation, bumpBin } from "@/lib/active-location";
 import { sql } from "drizzle-orm";
 
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         ingredientId: body.ingredientId,
         receivedBy: session.id,
         quantity: body.quantity.toFixed(3),
-        unitCost: body.unitCost.toFixed(2),
+        unitCost: formatUnitCost(body.unitCost),
         supplierNote: body.supplierNote,
         locationId: location.id,
       })
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     const { onHand } = await bumpBin(location.id, ing.id, body.quantity);
     await db
       .update(ingredients)
-      .set({ costPerUnit: body.unitCost.toFixed(2) })
+      .set({ costPerUnit: formatUnitCost(body.unitCost) })
       .where(eq(ingredients.id, ing.id));
 
     return jsonOk({ receipt, currentStock: onHand }, { status: 201 });

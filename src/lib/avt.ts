@@ -186,11 +186,15 @@ export async function computeAvT(params: {
       const unaccountedLoss =
         totalVariance - (loggedKitchenWastage + returnedDishWaste);
       const costPerUnit = num(row.costPerUnit);
+      const unaccountedCost = unaccountedLoss * costPerUnit;
       const variancePercentOfTheoretical =
         theoreticalUsage > 0 ? (unaccountedLoss / theoreticalUsage) * 100 : null;
+      // When nothing sold, still flag a real gap in quantity or dollar loss.
       const exceedsThreshold =
-        variancePercentOfTheoretical !== null &&
-        Math.abs(variancePercentOfTheoretical) > params.thresholdPercent;
+        theoreticalUsage > 0
+          ? variancePercentOfTheoretical !== null &&
+            Math.abs(variancePercentOfTheoretical) > params.thresholdPercent
+          : Math.abs(unaccountedLoss) >= 0.001 || Math.abs(unaccountedCost) >= 0.01;
 
       return {
         ingredientId: row.id,
@@ -206,7 +210,7 @@ export async function computeAvT(params: {
         loggedKitchenWastage,
         returnedDishWaste,
         unaccountedLoss,
-        unaccountedCost: unaccountedLoss * costPerUnit,
+        unaccountedCost,
         variancePercentOfTheoretical,
         exceedsThreshold,
       };

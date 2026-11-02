@@ -112,7 +112,7 @@ export async function POST(request: Request) {
               name: ing.name,
               category: ing.category,
               unit: ing.unit,
-              costPerUnit: (ing.estimatedCostPerUnit ?? 0).toFixed(2),
+              costPerUnit: (ing.estimatedCostPerUnit ?? 0).toFixed(6),
               currentStock: "0.000",
             })
             .returning();

@@ -38,6 +38,17 @@ export default function ShiftsPage() {
     alreadyClosed?: boolean;
   } | null>(null);
 
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unauthorized");
+      return data as { user: { role: string } };
+    },
+  });
+  const showCost = me.data?.user?.role === "OWNER";
+
   const list = useQuery({
     queryKey: ["ingredients"],
     queryFn: async () => {
@@ -187,12 +198,15 @@ export default function ShiftsPage() {
                   {row.theoreticalUsage.toFixed(3)} · Unaccounted{" "}
                   {row.unaccountedLoss.toFixed(3)} {row.unit}
                 </p>
-                <p className="text-[var(--muted)]">
-                  Unaccounted cost {money(row.unaccountedCost)}
-                  {row.variancePercentOfTheoretical !== null
-                    ? ` · ${row.variancePercentOfTheoretical.toFixed(1)}% of theoretical`
-                    : ""}
-                </p>
+                {(showCost || row.variancePercentOfTheoretical !== null) && (
+                  <p className="text-[var(--muted)]">
+                    {showCost ? `Unaccounted cost ${money(row.unaccountedCost)}` : ""}
+                    {showCost && row.variancePercentOfTheoretical !== null ? " · " : ""}
+                    {row.variancePercentOfTheoretical !== null
+                      ? `${row.variancePercentOfTheoretical.toFixed(1)}% of theoretical`
+                      : ""}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

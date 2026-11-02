@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,19 @@ import { Label } from "@/components/ui/label";
 export default function AccountPage() {
   const [name, setName] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unauthorized");
+      return data as { restaurant: { name: string } | null };
+    },
+  });
+  const restaurantName = me.data?.restaurant?.name ?? "";
+  const nameMatches =
+    Boolean(restaurantName) && name.trim() === restaurantName;
 
   return (
     <div className="space-y-4">
@@ -41,7 +55,11 @@ export default function AccountPage() {
         <CardTitle>Delete restaurant</CardTitle>
         <p className="text-sm text-[var(--muted)]">
           This removes the menu, stock, tickets, and staff sign-in. It cannot
-          be undone.
+          be undone. Type{" "}
+          <span className="font-medium text-[var(--fg)]">
+            {restaurantName || "the restaurant name"}
+          </span>{" "}
+          exactly to enable delete.
         </p>
         <div>
           <Label>Type the restaurant name</Label>
@@ -49,7 +67,7 @@ export default function AccountPage() {
         </div>
         <Button
           variant="danger"
-          disabled={!name.trim()}
+          disabled={!nameMatches}
           onClick={async () => {
             const res = await fetch("/api/account", {
               method: "DELETE",

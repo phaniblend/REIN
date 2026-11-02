@@ -3,13 +3,41 @@ import { describe, it } from "node:test";
 import { cogsCents } from "./cogs";
 import { parseInvoiceText } from "./invoice-text";
 import { countWindowStart } from "./count-window";
-import { convertQty, matchConfidence, sameDish } from "./units";
+import {
+  convertInvoiceToStock,
+  convertQty,
+  matchConfidence,
+  sameDish,
+  unitFromInvoiceText,
+} from "./units";
 
 describe("units", () => {
   it("converts mass and volume", () => {
     assert.equal(convertQty(2, "KG", "G"), 2000);
     assert.equal(convertQty(500, "ML", "L"), 0.5);
     assert.equal(convertQty(1, "KG", "L"), null);
+  });
+
+  it("converts invoice lines into the stock unit", () => {
+    const converted = convertInvoiceToStock({
+      qty: 8000,
+      unitPrice: 0.0016,
+      fromUnit: "G",
+      toUnit: "KG",
+    });
+    assert.ok(converted);
+    assert.equal(converted?.qty, 8);
+    assert.ok(Math.abs((converted?.unitCost ?? 0) - 1.6) < 1e-9);
+    assert.equal(unitFromInvoiceText("Onion 8000 G 0.0016"), "G");
+    assert.equal(
+      convertInvoiceToStock({
+        qty: 1,
+        unitPrice: 1,
+        fromUnit: "KG",
+        toUnit: "L",
+      }),
+      null,
+    );
   });
 
   it("treats parenthetical and near-duplicate dish names as the same", () => {

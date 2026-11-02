@@ -57,17 +57,21 @@ export async function POST() {
       ),
     )
     .limit(1);
+  if (!connection) {
+    return jsonError("Connect QuickBooks first", 400);
+  }
   let status = "queued";
   let externalId: string | null = null;
-  if (connection && amountCents > 0) {
+  if (amountCents > 0) {
     const creds = await loadCredentials(connection.encryptedTokens);
-    if (creds?.realmId) {
-      externalId = await pushQuickBooksJournal(creds, {
-        amount: amountCents / 100,
-        note: `Restman food cost ${payload.day}`,
-      });
-      status = "sent";
+    if (!creds?.realmId) {
+      return jsonError("Connect QuickBooks first", 400);
     }
+    externalId = await pushQuickBooksJournal(creds, {
+      amount: amountCents / 100,
+      note: `Restman food cost ${payload.day}`,
+    });
+    status = "sent";
   }
   const [row] = await db
     .insert(accountingExports)

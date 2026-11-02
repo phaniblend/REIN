@@ -13,7 +13,8 @@ import {
 } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/api";
-import { num } from "@/lib/utils";
+import { convertInvoiceToStock, unitFromInvoiceText } from "@/lib/units";
+import { formatUnitCost, num } from "@/lib/utils";
 
 export async function POST(
   _request: Request,
@@ -49,6 +50,15 @@ export async function POST(
     return jsonError("Match at least one line to a stock item before confirming", 400);
   }
 
+  const prepared: {
+    line: (typeof postable)[number];
+    ing: typeof ingredients.$inferSelect;
+    qty: number;
+    unitCost: number;
+    previous: number;
+  }[] = [];
+  const unconvertible: string[] = [];
+
   for (const line of postable) {
     const ingredientId = line.ingredientId!;
     const [ing] = await db
@@ -62,16 +72,48 @@ export async function POST(
       )
       .limit(1);
     if (!ing) continue;
-    const qty = num(line.qty);
-    const unitCost = num(line.unitPriceCents) / 100;
-    const previous = num(ing.costPerUnit);
+    const fromUnit =
+      (line.unit || unitFromInvoiceText(line.rawText) || ing.unit).toUpperCase();
+    const converted = convertInvoiceToStock({
+      qty: num(line.qty),
+      unitPrice: num(line.unitPriceCents) / 100,
+      fromUnit,
+      toUnit: ing.unit,
+    });
+    if (!converted) {
+      unconvertible.push(`${ing.name} (${fromUnit} → ${ing.unit})`);
+      continue;
+    }
+    prepared.push({
+      line,
+      ing,
+      qty: converted.qty,
+      unitCost: converted.unitCost,
+      previous: num(ing.costPerUnit),
+    });
+  }
+
+  if (unconvertible.length) {
+    return jsonError(
+      `Can't convert units for: ${unconvertible.join(", ")}. Match those lines to items with a compatible unit.`,
+      400,
+    );
+  }
+  if (!prepared.length) {
+    return jsonError("Match at least one line to a stock item before confirming", 400);
+  }
+
+  for (const row of prepared) {
+    const { line, ing, qty, unitCost, previous } = row;
+    const ingredientId = ing.id;
     await db.insert(stockReceipts).values({
       restaurantId: session.restaurantId,
       ingredientId,
       receivedBy: session.id,
       quantity: qty.toFixed(3),
-      unitCost: unitCost.toFixed(2),
+      unitCost: formatUnitCost(unitCost),
       supplierNote: `Invoice ${invoice.supplierName}`,
+      locationId: invoice.locationId,
     });
     await db.insert(priceHistory).values({
       ingredientId,
@@ -82,7 +124,7 @@ export async function POST(
       .update(ingredients)
       .set({
         currentStock: (num(ing.currentStock) + qty).toFixed(3),
-        costPerUnit: unitCost.toFixed(2),
+        costPerUnit: formatUnitCost(unitCost),
       })
       .where(eq(ingredients.id, ingredientId));
     if (invoice.locationId) {

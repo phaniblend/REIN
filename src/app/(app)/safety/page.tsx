@@ -36,6 +36,17 @@ export default function SafetyPage() {
     },
   });
 
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unauthorized");
+      return data as { user: { role: string } };
+    },
+  });
+  const isOwner = me.data?.user?.role === "OWNER";
+
   const save = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/safety", {
@@ -45,13 +56,13 @@ export default function SafetyPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Could not save");
-      return data;
+      return data as { warning?: string | null };
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       setReading("");
       setNote("");
       setPhoto(undefined);
-      setError(null);
+      setError(data.warning ?? null);
       await qc.invalidateQueries({ queryKey: ["safety"] });
     },
     onError: (err: Error) => setError(err.message),
@@ -118,9 +129,11 @@ export default function SafetyPage() {
       <Card className="space-y-2">
         <div className="flex items-center justify-between">
           <CardTitle>This week</CardTitle>
-          <Link href="/safety/print" className="text-sm text-[var(--accent)]">
-            Print for inspection
-          </Link>
+          {isOwner && (
+            <Link href="/safety/print" className="text-sm text-[var(--accent)]">
+              Print for inspection
+            </Link>
+          )}
         </div>
         <ul className="space-y-2 text-sm">
           {(logs.data?.logs ?? []).map((log) => (

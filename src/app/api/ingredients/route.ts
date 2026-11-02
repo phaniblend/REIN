@@ -5,7 +5,7 @@ import { ingredients } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { activeLocation, binsFor, ensureLocationBins, setBin } from "@/lib/active-location";
-import { num } from "@/lib/utils";
+import { formatUnitCost, num } from "@/lib/utils";
 
 const createSchema = z.object({
   name: z.string().min(1),
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
         name,
         category: body.category,
         unit: body.unit,
-        costPerUnit: body.costPerUnit.toFixed(2),
+        costPerUnit: formatUnitCost(body.costPerUnit),
         currentStock: "0.000",
         parLevel: body.parLevel?.toFixed(3),
         shelfLifeDays: body.shelfLifeDays?.toFixed(1),

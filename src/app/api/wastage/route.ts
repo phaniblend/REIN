@@ -5,7 +5,7 @@ import { ingredients, wastageLogs } from "@/db/schema";
 import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { binsFor, bumpBin, ensureLocationBins } from "@/lib/active-location";
-import { num } from "@/lib/utils";
+import { formatUnitCost, num } from "@/lib/utils";
 import {
   WASTAGE_KINDS,
   canLogWastageKind,
@@ -124,7 +124,7 @@ export async function POST(request: Request) {
         ingredientId: body.ingredientId,
         loggedBy: session.id,
         quantity: body.quantity.toFixed(3),
-        unitCost: num(ing.costPerUnit).toFixed(2),
+        unitCost: formatUnitCost(num(ing.costPerUnit)),
         shortfall: shortfall.toFixed(3),
         kind: body.kind,
         reason: body.reason,

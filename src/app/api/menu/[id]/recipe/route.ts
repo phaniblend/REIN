@@ -77,7 +77,7 @@ export async function PUT(
               name,
               category: line.category?.trim() || "General",
               unit: line.unit ?? "G",
-              costPerUnit: (line.costPerUnit ?? 0).toFixed(2),
+              costPerUnit: (line.costPerUnit ?? 0).toFixed(6),
               currentStock: "0.000",
             })
             .returning();

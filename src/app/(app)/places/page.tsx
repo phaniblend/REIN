@@ -120,9 +120,11 @@ export default function PlacesPage() {
                 {location.name}
                 {location.id === data.data?.activeLocationId ? " · active" : ""}
               </span>
-              <Button size="sm" variant="ghost" onClick={() => activate.mutate(location.id)}>
-                Use
-              </Button>
+              {location.id !== data.data?.activeLocationId && (
+                <Button size="sm" variant="ghost" onClick={() => activate.mutate(location.id)}>
+                  Use
+                </Button>
+              )}
             </li>
           ))}
         </ul>

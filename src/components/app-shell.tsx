@@ -61,10 +61,26 @@ const allLinks: NavLink[] = [
     icon: ShoppingCart,
     roles: ["OWNER"],
   },
-  { href: "/prep", label: "Prep", icon: ClipboardList, roles: ["OWNER"] },
+  {
+    href: "/prep",
+    label: "Prep",
+    icon: ClipboardList,
+    roles: ["OWNER", "CHEF"],
+  },
   { href: "/schedule", label: "Labor", icon: CalendarClock, roles: ["OWNER"] },
-  { href: "/safety", label: "Safety", icon: Thermometer, roles: ["OWNER"] },
+  {
+    href: "/safety",
+    label: "Safety",
+    icon: Thermometer,
+    roles: ["OWNER", "CHEF", "WAITER", "STOCK_CLERK"],
+  },
   { href: "/places", label: "Places", icon: Building2, roles: ["OWNER"] },
+  {
+    href: "/invoices",
+    label: "Invoices",
+    icon: FileText,
+    roles: ["STOCK_CLERK"],
+  },
   { href: "/inventory", label: "Stock", icon: Package },
   {
     href: "/recipes",

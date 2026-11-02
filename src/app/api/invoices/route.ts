@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { jsonError, jsonOk, readJson } from "@/lib/api";
 import { matchLines, parseInvoiceText, type ParsedLine } from "@/lib/invoice-text";
 import { activeLocation } from "@/lib/active-location";
+import { formatPriceCents } from "@/lib/utils";
 
 const schema = z
   .object({
@@ -21,8 +22,8 @@ const schema = z
 export async function GET() {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (session.role !== "OWNER") {
-    return jsonError("Only the owner can see invoices", 403);
+  if (!["OWNER", "STOCK_CLERK"].includes(session.role)) {
+    return jsonError("Only the owner or stock clerk can see invoices", 403);
   }
 
   const rows = await db
@@ -44,8 +45,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return jsonError("Unauthorized", 401);
-  if (session.role !== "OWNER") {
-    return jsonError("Only the owner can scan invoices", 403);
+  if (!["OWNER", "STOCK_CLERK"].includes(session.role)) {
+    return jsonError("Only the owner or stock clerk can scan invoices", 403);
   }
 
   try {
@@ -124,7 +125,8 @@ export async function POST(request: Request) {
           rawText: line.rawText,
           ingredientId: line.ingredientId,
           qty: line.qty.toFixed(3),
-          unitPriceCents: String(Math.round(line.unitPrice * 100)),
+          unit: line.unit || "",
+          unitPriceCents: formatPriceCents(line.unitPrice),
           confidence: Math.max(0, Math.min(line.confidence, 1)).toFixed(3),
         })),
       )

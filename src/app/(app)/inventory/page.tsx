@@ -35,6 +35,20 @@ export default function InventoryPage() {
     unitCost: "",
   });
 
+  const me = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/me");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Unauthorized");
+      return data as { user: { role: string } };
+    },
+  });
+  const role = me.data?.user?.role ?? "";
+  const canEditStock = ["OWNER", "CHEF", "STOCK_CLERK"].includes(role);
+  const canSetCost = role === "OWNER" || role === "STOCK_CLERK";
+  const showPlacesHint = role === "OWNER";
+
   const list = useQuery({
     queryKey: ["ingredients"],
     queryFn: async () => {
@@ -52,7 +66,7 @@ export default function InventoryPage() {
           name: form.name,
           category: form.category,
           unit: form.unit,
-          costPerUnit: Number(form.costPerUnit),
+          costPerUnit: Number(form.costPerUnit || 0),
           currentStock: Number(form.currentStock),
           parLevel: Number(form.parLevel),
           allergens: form.allergens,
@@ -84,7 +98,7 @@ export default function InventoryPage() {
         body: JSON.stringify({
           ingredientId: receipt.ingredientId,
           quantity: Number(receipt.quantity),
-          unitCost: Number(receipt.unitCost),
+          unitCost: Number(receipt.unitCost || 0),
         }),
       });
       const data = await res.json();
@@ -106,10 +120,12 @@ export default function InventoryPage() {
       </h1>
       {list.data?.locationName && (
         <p className="text-sm text-[var(--muted)]">
-          On hand at {list.data.locationName}. Change site under Places.
+          On hand at {list.data.locationName}.
+          {showPlacesHint ? " Change site under Places." : ""}
         </p>
       )}
 
+      {canEditStock && (
       <Card className="space-y-3">
         <CardTitle>Add ingredient</CardTitle>
         <div className="grid gap-2">
@@ -145,10 +161,12 @@ export default function InventoryPage() {
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2">
+            {canSetCost && (
             <div>
               <Label>Cost / unit</Label>
               <Input
                 type="number"
+                step="any"
                 placeholder="0"
                 value={form.costPerUnit}
                 onChange={(e) =>
@@ -156,6 +174,7 @@ export default function InventoryPage() {
                 }
               />
             </div>
+            )}
             <div>
               <Label>Stock</Label>
               <Input
@@ -198,7 +217,9 @@ export default function InventoryPage() {
           )}
         </div>
       </Card>
+      )}
 
+      {canEditStock && (
       <Card className="space-y-3">
         <CardTitle>Receive purchase</CardTitle>
         <select
@@ -224,14 +245,17 @@ export default function InventoryPage() {
               setReceipt({ ...receipt, quantity: e.target.value })
             }
           />
-          <Input
-            type="number"
-            placeholder="Unit cost"
-            value={receipt.unitCost}
-            onChange={(e) =>
-              setReceipt({ ...receipt, unitCost: e.target.value })
-            }
-          />
+          {canSetCost && (
+            <Input
+              type="number"
+              step="any"
+              placeholder="Unit cost"
+              value={receipt.unitCost}
+              onChange={(e) =>
+                setReceipt({ ...receipt, unitCost: e.target.value })
+              }
+            />
+          )}
         </div>
         <Button
           variant="secondary"
@@ -241,6 +265,7 @@ export default function InventoryPage() {
           Log receipt
         </Button>
       </Card>
+      )}
 
       <div className="space-y-2">
         {ingredients.map((i) => (

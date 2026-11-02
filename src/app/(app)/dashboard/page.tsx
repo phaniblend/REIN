@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { homePathForRole } from "@/lib/roles";
 import { money, num } from "@/lib/utils";
@@ -21,6 +21,7 @@ type Ingredient = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [actionNote, setActionNote] = useState<string | null>(null);
 
   const me = useQuery({
     queryKey: ["me"],
@@ -171,34 +172,48 @@ export default function DashboardPage() {
                 .join(", ")}
         </p>
         {showLaunchExtras() && (
-          <>
-        <button
-          type="button"
-          className="text-sm font-medium text-[var(--accent)]"
-          onClick={async () => {
-            const res = await fetch("/api/accounting/cogs", { method: "POST" });
-            const data = await res.json();
-            if (!res.ok) return;
-            window.alert(
-              data.amountCents
-                ? `Food cost entry saved for $${(data.amountCents / 100).toFixed(2)}.`
-                : "No sales yet today, so the food-cost entry is zero.",
-            );
-          }}
-        >
-          Post today&apos;s food cost to the books
-        </button>
-        <button
-          type="button"
-          className="text-sm font-medium text-[var(--accent)]"
-          onClick={async () => {
-            await fetch("/api/digest", { method: "POST" });
-            await alerts.refetch();
-          }}
-        >
-          Send today&apos;s digest
-        </button>
-          </>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              className="text-left text-sm font-medium text-[var(--accent)]"
+              onClick={async () => {
+                setActionNote(null);
+                const res = await fetch("/api/accounting/cogs", { method: "POST" });
+                const data = await res.json();
+                if (!res.ok) {
+                  setActionNote(data.error ?? "Connect QuickBooks first");
+                  return;
+                }
+                setActionNote(
+                  data.amountCents
+                    ? `Food cost entry saved for $${(data.amountCents / 100).toFixed(2)}.`
+                    : "No sales yet today, so the food-cost entry is zero.",
+                );
+              }}
+            >
+              Post today&apos;s food cost to the books
+            </button>
+            <button
+              type="button"
+              className="text-left text-sm font-medium text-[var(--accent)]"
+              onClick={async () => {
+                setActionNote(null);
+                const res = await fetch("/api/digest", { method: "POST" });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                  setActionNote(data.error ?? "Could not send digest");
+                  return;
+                }
+                setActionNote("Digest sent.");
+                await alerts.refetch();
+              }}
+            >
+              Send today&apos;s digest
+            </button>
+            {actionNote && (
+              <p className="text-sm text-[var(--muted)]">{actionNote}</p>
+            )}
+          </div>
         )}
       </Card>
 

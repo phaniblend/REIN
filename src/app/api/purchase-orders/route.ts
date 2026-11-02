@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { ingredients, poLines, purchaseOrders, suppliers } from "@/db/schema";
@@ -40,8 +40,9 @@ export async function GET() {
     .where(eq(purchaseOrders.restaurantId, session.restaurantId))
     .orderBy(desc(purchaseOrders.createdAt))
     .limit(20);
-  const lines = orders.length
-    ? await db.select().from(poLines)
+  const orderIds = orders.map((order) => order.id);
+  const lines = orderIds.length
+    ? await db.select().from(poLines).where(inArray(poLines.purchaseOrderId, orderIds))
     : [];
   return jsonOk({ suggestions, orders, lines });
 }
@@ -126,26 +127,54 @@ export async function sendPurchaseOrder(orderId: string, restaurantId: string, u
     .select()
     .from(ingredients)
     .where(eq(ingredients.restaurantId, restaurantId));
-  const names = new Map(stock.map((row) => [row.id, `${row.name} ${row.unit}`]));
+  const byId = new Map(stock.map((row) => [row.id, row]));
   const message = [
     `Order from the kitchen for ${order.supplierName}`,
-    ...lines.map((line) => `${names.get(line.ingredientId) ?? "Item"} × ${line.qty}`),
+    ...lines.map((line) => {
+      const item = byId.get(line.ingredientId);
+      if (!item) return `${line.qty} unknown item`;
+      return `${Number(line.qty).toFixed(3)} ${item.unit} ${item.name}`;
+    }),
   ].join("\n");
   let channel = "saved";
+  let delivered = false;
   if (order.supplierId) {
     const [supplier] = await db
       .select()
       .from(suppliers)
       .where(eq(suppliers.id, order.supplierId))
       .limit(1);
-    if (supplier?.email) {
+    if (!supplier?.email && !supplier?.phone) {
+      return {
+        error: "Add a supplier phone or email before sending, or keep this as a draft",
+        status: 400,
+      } as const;
+    }
+    if (supplier.email) {
       const mail = await sendEmail(supplier.email, `Order for ${order.supplierName}`, message);
-      channel = mail.ok ? mail.provider : channel;
+      if (mail.ok) {
+        channel = mail.provider;
+        delivered = true;
+      }
     }
-    if (supplier?.phone) {
+    if (supplier.phone) {
       const sms = await sendSms(supplier.phone, message);
-      channel = supplier.email ? `${channel}+${sms.provider}` : sms.provider;
+      if (sms.ok) {
+        channel = supplier.email && delivered ? `${channel}+${sms.provider}` : sms.provider;
+        delivered = true;
+      }
     }
+  } else {
+    return {
+      error: "Add a supplier phone or email before sending, or keep this as a draft",
+      status: 400,
+    } as const;
+  }
+  if (!delivered) {
+    return {
+      error: "Could not reach the supplier. Check email/SMS setup, or keep this as a draft",
+      status: 502,
+    } as const;
   }
   await db
     .update(purchaseOrders)

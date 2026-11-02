@@ -23,6 +23,13 @@ type Order = {
   createdAt: string;
 };
 
+type PoLine = {
+  id: string;
+  purchaseOrderId: string;
+  ingredientId: string;
+  qty: string;
+};
+
 export default function PurchasingPage() {
   const qc = useQueryClient();
   const [supplierName, setSupplierName] = useState("");
@@ -49,9 +56,19 @@ export default function PurchasingPage() {
       const res = await fetch("/api/purchase-orders");
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Could not load orders");
-      return body as { suggestions: Line[]; orders: Order[] };
+      return body as {
+        suggestions: Line[];
+        orders: Order[];
+        lines: PoLine[];
+      };
     },
   });
+  const ingredientMeta = new Map(
+    (data.data?.suggestions ?? []).map((line) => [
+      line.ingredientId,
+      { name: line.name, unit: line.unit },
+    ]),
+  );
 
   const draft = useMutation({
     mutationFn: async () => {
@@ -175,12 +192,27 @@ export default function PurchasingPage() {
           Save draft
         </Button>
       </Card>
-      {(data.data?.orders ?? []).map((order) => (
+      {(data.data?.orders ?? []).map((order) => {
+        const orderLines = (data.data?.lines ?? []).filter(
+          (line) => line.purchaseOrderId === order.id,
+        );
+        return (
         <Card key={order.id} className="space-y-2">
           <div className="flex items-center justify-between">
             <CardTitle>{order.supplierName}</CardTitle>
             <Badge>{order.status}</Badge>
           </div>
+          <ul className="space-y-1 text-sm text-[var(--muted)]">
+            {orderLines.map((line) => {
+              const meta = ingredientMeta.get(line.ingredientId);
+              return (
+                <li key={line.id}>
+                  {Number(line.qty).toFixed(3)} {meta?.unit ?? ""} {meta?.name ?? "Item"}
+                </li>
+              );
+            })}
+            {orderLines.length === 0 && <li>No lines on this draft.</li>}
+          </ul>
           {order.status === "draft" && isOwner && (
             <Button size="sm" disabled={send.isPending} onClick={() => send.mutate(order.id)}>
               Send
@@ -190,7 +222,8 @@ export default function PurchasingPage() {
             <p className="text-xs text-[var(--muted)]">Waiting for the owner to send.</p>
           )}
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }
