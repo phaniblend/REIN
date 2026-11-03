@@ -46,9 +46,26 @@ export async function GET() {
     .orderBy(desc(purchaseOrders.createdAt))
     .limit(20);
   const orderIds = orders.map((order) => order.id);
-  const lines = orderIds.length
+  const rawLines = orderIds.length
     ? await db.select().from(poLines).where(inArray(poLines.purchaseOrderId, orderIds))
     : [];
+  const stockRows = await db
+    .select({
+      id: ingredients.id,
+      name: ingredients.name,
+      unit: ingredients.unit,
+    })
+    .from(ingredients)
+    .where(eq(ingredients.restaurantId, session.restaurantId));
+  const stockById = new Map(stockRows.map((row) => [row.id, row]));
+  const lines = rawLines.map((line) => {
+    const item = stockById.get(line.ingredientId);
+    return {
+      ...line,
+      name: item?.name ?? null,
+      unit: item?.unit ?? null,
+    };
+  });
   return jsonOk({ suggestions, orders, lines, hasPars });
 }
 

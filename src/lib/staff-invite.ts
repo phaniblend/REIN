@@ -83,6 +83,23 @@ export async function createStaffInvite(opts: {
   };
 }
 
+export async function cancelStaffInvite(restaurantId: string, inviteId: string) {
+  const [invite] = await db
+    .select()
+    .from(staffInvites)
+    .where(
+      and(
+        eq(staffInvites.id, inviteId),
+        eq(staffInvites.restaurantId, restaurantId),
+        isNull(staffInvites.acceptedAt),
+      ),
+    )
+    .limit(1);
+  if (!invite) return null;
+  await db.delete(staffInvites).where(eq(staffInvites.id, invite.id));
+  return invite;
+}
+
 export async function listStaffAndInvites(restaurantId: string) {
   const team = await db
     .select({

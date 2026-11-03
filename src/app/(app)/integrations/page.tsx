@@ -93,7 +93,15 @@ export default function IntegrationsPage() {
   });
 
   const connections = data.data?.connections ?? [];
-  const live = connections.find((row) => row.status === "connected");
+  const live = connections.find(
+    (row) =>
+      row.status === "connected" &&
+      row.provider !== "deliverect" &&
+      row.provider !== "quickbooks",
+  );
+  const deliveryOn = connections.some(
+    (row) => row.provider === "deliverect" && row.status === "connected",
+  );
   const unmapped = (data.data?.catalog ?? []).filter((row) => !row.dishId);
   const mapped = (data.data?.catalog ?? []).filter((row) => row.dishId);
 
@@ -198,16 +206,19 @@ export default function IntegrationsPage() {
             </div>
           );
         })}
-        {isOwner && (
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={act.isPending}
-            onClick={() => act.mutate({ action: "connect-delivery" })}
-          >
-            Enable delivery sales
-          </Button>
-        )}
+        {isOwner &&
+          (deliveryOn ? (
+            <p className="text-sm text-[var(--muted)]">Delivery sales on</p>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={act.isPending}
+              onClick={() => act.mutate({ action: "connect-delivery" })}
+            >
+              Enable delivery sales
+            </Button>
+          ))}
       </Card>
 
       <Card className="space-y-3">

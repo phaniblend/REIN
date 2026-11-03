@@ -28,14 +28,56 @@ function alertLabel(type: string, payload: string | null) {
   return type.replaceAll("_", " ") + name;
 }
 
+/** Midnight at the start of "today" in the location timezone (UTC instant). */
+export function startOfDayInTimezone(timeZone: string, now = new Date()) {
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  const parts = Object.fromEntries(
+    fmt
+      .formatToParts(now)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  ) as Record<string, string>;
+  const asUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  const offsetMs = asUtc - now.getTime();
+  const midnightAsUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    0,
+    0,
+    0,
+  );
+  return new Date(midnightAsUtc - offsetMs);
+}
+
 export async function buildDigest(restaurantId: string) {
   const [restaurant] = await db
     .select()
     .from(restaurants)
     .where(eq(restaurants.id, restaurantId))
     .limit(1);
-  const since = new Date();
-  since.setHours(0, 0, 0, 0);
+  const [site] = await db
+    .select({ timezone: locations.timezone })
+    .from(locations)
+    .where(eq(locations.restaurantId, restaurantId))
+    .limit(1);
+  const since = startOfDayInTimezone(site?.timezone || "America/Chicago");
   const sales = await db
     .select({ netCents: posSaleLines.netCents, channel: posSaleLines.channel })
     .from(posSaleLines)

@@ -97,6 +97,20 @@ export default function TeamPage() {
     onError: (err: Error) => setError(err.message),
   });
 
+  const cancelInvite = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/staff/invites/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Could not cancel invite");
+      return data;
+    },
+    onSuccess: () => {
+      setError(null);
+      qc.invalidateQueries({ queryKey: ["staff"] });
+    },
+    onError: (err: Error) => setError(err.message),
+  });
+
   const remove = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/staff/${id}`, { method: "DELETE" });
@@ -391,14 +405,33 @@ export default function TeamPage() {
                   </p>
                   <p className="truncate text-xs text-[var(--muted)]">{i.phone}</p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  type="button"
-                  onClick={() => copyLink(i.link)}
-                >
-                  Copy
-                </Button>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    type="button"
+                    onClick={() => copyLink(i.link)}
+                  >
+                    Copy
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    type="button"
+                    disabled={cancelInvite.isPending}
+                    onClick={() => {
+                      if (
+                        typeof window !== "undefined" &&
+                        !window.confirm(`Cancel invite for ${i.name ?? i.phone}?`)
+                      ) {
+                        return;
+                      }
+                      cancelInvite.mutate(i.id);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { cogsCents } from "./cogs";
+import { startOfDayInTimezone } from "./digest";
 import { parseInvoiceText } from "./invoice-text";
 import { countWindowStart } from "./count-window";
 import {
@@ -77,5 +78,14 @@ describe("books", () => {
   it("turns food-cost percent into cents", () => {
     assert.equal(cogsCents(10000, 32), 3200);
     assert.equal(cogsCents(0, 32), 0);
+  });
+});
+
+describe("digest day", () => {
+  it("starts the Chicago day before UTC midnight crosses", () => {
+    // 2026-11-03 02:06 UTC = Nov 2 8:06 PM CST
+    const evening = new Date("2026-11-03T02:06:00.000Z");
+    const start = startOfDayInTimezone("America/Chicago", evening);
+    assert.equal(start.toISOString(), "2026-11-02T06:00:00.000Z");
   });
 });

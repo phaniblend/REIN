@@ -28,6 +28,8 @@ type PoLine = {
   purchaseOrderId: string;
   ingredientId: string;
   qty: string;
+  name?: string | null;
+  unit?: string | null;
 };
 
 export default function PurchasingPage() {
@@ -64,13 +66,6 @@ export default function PurchasingPage() {
       };
     },
   });
-  const ingredientMeta = new Map(
-    (data.data?.suggestions ?? []).map((line) => [
-      line.ingredientId,
-      { name: line.name, unit: line.unit },
-    ]),
-  );
-
   const draft = useMutation({
     mutationFn: async () => {
       const lines = (data.data?.suggestions ?? []).filter((line) => picked[line.ingredientId]);
@@ -206,14 +201,11 @@ export default function PurchasingPage() {
             <Badge>{order.status}</Badge>
           </div>
           <ul className="space-y-1 text-sm text-[var(--muted)]">
-            {orderLines.map((line) => {
-              const meta = ingredientMeta.get(line.ingredientId);
-              return (
-                <li key={line.id}>
-                  {Number(line.qty).toFixed(3)} {meta?.unit ?? ""} {meta?.name ?? "Item"}
-                </li>
-              );
-            })}
+            {orderLines.map((line) => (
+              <li key={line.id}>
+                {Number(line.qty).toFixed(3)} {line.unit ?? ""} {line.name ?? "Item"}
+              </li>
+            ))}
             {orderLines.length === 0 && <li>No lines on this draft.</li>}
           </ul>
           {order.status === "draft" && isOwner && (
