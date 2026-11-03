@@ -12,6 +12,15 @@ import {
 import { ensureLocation } from "@/lib/pos-sync";
 import { verifyDemoSignature } from "@/lib/token-box";
 
+/** Railway serves on 0.0.0.0 — never redirect browsers to request.url.origin. */
+function publicOrigin() {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.APP_URL?.trim() ||
+    "https://www.restman.live"
+  ).replace(/\/$/, "");
+}
+
 async function saveConnection(input: {
   restaurantId: string;
   provider: "square" | "clover" | "toast" | "quickbooks";
@@ -57,7 +66,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ provider: string }> },
 ) {
-  const origin = new URL(request.url).origin;
+  const origin = publicOrigin();
   const session = await getSession();
   if (!session) return NextResponse.redirect(new URL("/login", origin));
   const { provider } = await context.params;

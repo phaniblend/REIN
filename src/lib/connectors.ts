@@ -46,7 +46,11 @@ function squareHost() {
 }
 
 function appOrigin() {
-  return (process.env.APP_URL || "https://www.restman.live").replace(/\/$/, "");
+  return (
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    process.env.APP_URL?.trim() ||
+    "https://www.restman.live"
+  ).replace(/\/$/, "");
 }
 
 export const squareConnector: PosConnector = {
