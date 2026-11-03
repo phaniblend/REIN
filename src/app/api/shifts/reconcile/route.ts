@@ -3,7 +3,7 @@ import { eq, sql, and } from "drizzle-orm";
 import { db } from "@/db";
 import { locations, requestKeys, restaurants, shiftCounts } from "@/db/schema";
 import { getSession } from "@/lib/auth";
-import { jsonError, jsonOk, readJson } from "@/lib/api";
+import { ApiClientError, jsonError, jsonOk, readJson } from "@/lib/api";
 import { computeAvT } from "@/lib/avt";
 import { countWindowStart } from "@/lib/count-window";
 import { posCoverage } from "@/lib/pos-sync";
@@ -136,6 +136,9 @@ export async function POST(request: Request) {
             eq(requestKeys.key, requestKey),
           ),
         );
+    }
+    if (err instanceof ApiClientError) {
+      return jsonError(err.message, err.status);
     }
     if (err instanceof z.ZodError) {
       return jsonError(err.issues[0]?.message ?? "Invalid input");

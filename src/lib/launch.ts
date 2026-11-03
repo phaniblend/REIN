@@ -12,3 +12,6 @@ export const LAUNCH_EXTRA_HREFS = [
   "/safety",
   "/places",
 ];
+
+/** Role workflows that stay in nav even when paid launch extras are off. */
+export const ALWAYS_NAV_HREFS = ["/prep", "/safety", "/invoices"];

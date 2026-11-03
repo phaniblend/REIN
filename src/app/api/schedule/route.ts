@@ -8,7 +8,7 @@ import {
   users,
 } from "@/db/schema";
 import { getSession } from "@/lib/auth";
-import { jsonError, jsonOk, readJson } from "@/lib/api";
+import { ApiClientError, jsonError, jsonOk, readJson } from "@/lib/api";
 import { dishFoodCosts } from "@/lib/food-cost";
 import { activeLocation } from "@/lib/active-location";
 import { num } from "@/lib/utils";
@@ -79,12 +79,36 @@ export async function GET() {
   });
 }
 
-const schema = z.object({
-  userId: z.string().uuid(),
-  startsAt: z.string().min(1),
-  endsAt: z.string().min(1),
-  hourlyRate: z.number().nonnegative(),
-});
+const schema = z
+  .object({
+    userId: z.string().uuid(),
+    startsAt: z.string().min(1),
+    endsAt: z.string().min(1),
+    hourlyRate: z.number().nonnegative(),
+  })
+  .strict();
+
+const deleteSchema = z.object({ id: z.string().uuid() }).strict();
+
+const patchSchema = z
+  .object({
+    id: z.string().uuid(),
+    startsAt: z.string().min(1),
+    endsAt: z.string().min(1),
+    hourlyRate: z.number().nonnegative(),
+  })
+  .strict();
+
+function scheduleClientError(err: unknown, fallback: string) {
+  if (err instanceof ApiClientError) {
+    return jsonError(err.message, err.status);
+  }
+  if (err instanceof z.ZodError) {
+    return jsonError(err.issues[0]?.message ?? "Invalid input", 400);
+  }
+  console.error(err);
+  return jsonError(fallback, 500);
+}
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -118,11 +142,7 @@ export async function POST(request: Request) {
       .returning();
     return jsonOk({ shift }, { status: 201 });
   } catch (err) {
-    if (err instanceof z.ZodError) {
-      return jsonError(err.issues[0]?.message ?? "Invalid input", 400);
-    }
-    console.error(err);
-    return jsonError("Could not save the shift", 500);
+    return scheduleClientError(err, "Could not save the shift");
   }
 }
 
@@ -131,9 +151,7 @@ export async function DELETE(request: Request) {
   if (!session) return jsonError("Unauthorized", 401);
   if (session.role !== "OWNER") return jsonError("Only the owner can change the schedule", 403);
   try {
-    const body = z
-      .object({ id: z.string().uuid() })
-      .parse(await readJson(request));
+    const body = deleteSchema.parse(await readJson(request));
     const [shift] = await db
       .select()
       .from(staffShifts)
@@ -148,11 +166,7 @@ export async function DELETE(request: Request) {
     await db.delete(staffShifts).where(eq(staffShifts.id, shift.id));
     return jsonOk({ deleted: true });
   } catch (err) {
-    if (err instanceof z.ZodError) {
-      return jsonError(err.issues[0]?.message ?? "Invalid input", 400);
-    }
-    console.error(err);
-    return jsonError("Could not delete the shift", 500);
+    return scheduleClientError(err, "Could not delete the shift");
   }
 }
 
@@ -161,14 +175,7 @@ export async function PATCH(request: Request) {
   if (!session) return jsonError("Unauthorized", 401);
   if (session.role !== "OWNER") return jsonError("Only the owner can change the schedule", 403);
   try {
-    const body = z
-      .object({
-        id: z.string().uuid(),
-        startsAt: z.string().min(1),
-        endsAt: z.string().min(1),
-        hourlyRate: z.number().nonnegative(),
-      })
-      .parse(await readJson(request));
+    const body = patchSchema.parse(await readJson(request));
     const startsAt = new Date(body.startsAt);
     const endsAt = new Date(body.endsAt);
     if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
@@ -197,10 +204,6 @@ export async function PATCH(request: Request) {
       .returning();
     return jsonOk({ shift: updated });
   } catch (err) {
-    if (err instanceof z.ZodError) {
-      return jsonError(err.issues[0]?.message ?? "Invalid input", 400);
-    }
-    console.error(err);
-    return jsonError("Could not update the shift", 500);
+    return scheduleClientError(err, "Could not update the shift");
   }
 }

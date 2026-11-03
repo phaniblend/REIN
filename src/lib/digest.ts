@@ -84,10 +84,16 @@ export async function buildDigest(restaurantId: string) {
     .where(eq(shiftCounts.restaurantId, restaurantId))
     .orderBy(desc(shiftCounts.createdAt))
     .limit(3);
+  const foodLine =
+    salesCents <= 0
+      ? "Food cost: no sales yet today"
+      : food === null
+        ? "Food cost: no priced recipes yet"
+        : `Food cost ${food.toFixed(0)}%`;
   const lines = [
     `${restaurant?.name ?? "Restman"} daily digest`,
     `Sales $${(salesCents / 100).toFixed(2)} (delivery $${(deliveryCents / 100).toFixed(2)})`,
-    food === null ? "Food cost: no priced recipes yet" : `Food cost ${food.toFixed(0)}%`,
+    foodLine,
     `Waste logs today: ${waste.length}`,
     openAlerts.length
       ? `Alerts: ${openAlerts.map((row) => alertLabel(row.type, row.payload)).join("; ")}`

@@ -25,7 +25,11 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { RestmanLogo } from "@/components/restman-logo";
 import type { UserRole } from "@/lib/roles";
-import { LAUNCH_EXTRA_HREFS, showLaunchExtras } from "@/lib/launch";
+import {
+  ALWAYS_NAV_HREFS,
+  LAUNCH_EXTRA_HREFS,
+  showLaunchExtras,
+} from "@/lib/launch";
 
 type NavLink = {
   href: string;
@@ -149,6 +153,7 @@ export function AppShell({
 
   const links = allLinks.filter((l) => {
     if (l.roles && !l.roles.includes(role)) return false;
+    if (ALWAYS_NAV_HREFS.includes(l.href)) return true;
     if (!showLaunchExtras() && LAUNCH_EXTRA_HREFS.includes(l.href)) return false;
     return true;
   });

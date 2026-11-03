@@ -131,7 +131,7 @@ export default function InvoicesPage() {
           Invoices
         </h1>
         <p className="text-sm text-[var(--muted)]">
-          Paste a delivery. Nothing hits stock until someone confirms it.
+          Paste a delivery. Nothing hits stock until the owner confirms it.
         </p>
       </div>
 
@@ -271,7 +271,7 @@ export default function InvoicesPage() {
             )}
             {invoice.status === "draft" && me.data && !canConfirm && (
               <p className="text-xs text-[var(--muted)]">
-                The owner or stock clerk confirms this before stock changes.
+                The owner confirms this before stock changes.
               </p>
             )}
           </Card>
